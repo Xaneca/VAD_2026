@@ -49,10 +49,10 @@ def main(path, path_cel, path_jon, new_file_name):
     ######## MERGE DATAFRAMES #############################
     #######################################################
     df_cel = df_cel[["NORAD_CAT_ID", "PERIOD", "INCLINATION", "APOGEE", "PERIGEE", "RCS", "DATA_STATUS_CODE", "ORBIT_CENTER", "ORBIT_TYPE"]]
-    df["Satcat"] = df["Satcat"].astype(int)
+    df["NORAD_CAT_ID"] = df["NORAD_CAT_ID"].astype('Int64')
 
-    df_merged = df.merge(df_cel, left_on="Satcat", right_on="NORAD_CAT_ID", how="left")
-    df_merged.drop(columns=["NORAD_CAT_ID"], inplace=True)
+    df_merged = df.merge(df_cel, left_on="NORAD_CAT_ID", right_on="NORAD_CAT_ID", how="left")
+    # df_merged.drop(columns=["NORAD_CAT_ID"], inplace=True)
     # df_merged = df_merged.merge(df_jon, left_on="NORAD_CAT_ID", right_on="NORAD_CAT_ID", how="left")
 
     df_merged.to_csv(path + f"{new_file_name}.csv", index=False)
