@@ -1,0 +1,37 @@
+LAUNCH_SITE,count,LATITUDE,LONGITUDE,LOCATION_NAME,COUNTRY
+AFETR,13915,28.467, -80.567,Cape Canaveral, USA
+PLMSC,13623,62.926, 40.578,Plesetsk Cosmodrome, Russia
+TYMSC,12742,45.965, 63.305,Baikonur Cosmodrome, Kazakhstan
+AFWTR,12432,34.733,-120.567,Vandenberg SFB, USA
+TAISC,6518,38.849,111.608,Taiyuan Satellite Launch Center, China
+FRGUI,2130,5.239,-52.768,Guiana Space Centre, French Guiana
+JSC,1222,41.117,100.467,Jiuquan Satellite Launch Center, China
+SRILR,1158,13.720,80.230,Satish Dhawan Space Centre, India
+XICLF,910,28.246,102.027,Xichang Satellite Launch Center, China
+TANSC,565,30.400,130.970,Tanegashima Space Center, Japan
+VOSTO,508,51.884,128.334,Vostochny Cosmodrome, Russia
+KYMSC,404,48.567,46.250,Kapustin Yar, Russia
+RLLB,381,-39.261,177.865,Mahia Peninsula (Rocket Lab), NZ
+WSC,322,30.958,131.071,Uchinoura Space Center, Japan
+WLPIS,303,37.833, -75.483,Wallops Island, USA
+KSCUT,171,31.250,131.082,Kagoshima Space Center, Japan
+DLS,115,18.660,109.480,Wenchang Space Launch Site, China
+SEAL,111,0.000,-154.000,Sea Launch (Equator)
+YSLA,110,34.426,127.205,Naro Space Center, South Korea
+ERAS,94,-12.424,130.892,Equatorial Rocket Africa (Approx)
+WRAS,82,-31.110,136.780,Woomera Range, Australia
+HGSTR,48,37.135,-116.064,Holloman AFB / Nevada Test Site, USA
+KODAK,42,57.435,-152.340,Kodiak Launch Complex, USA
+NSC,32,36.650,126.680,Naro (Alt Name), South Korea
+SCSLA,27,33.500,130.500,South China Sea (Sea Launch China)
+YAVNE,23,31.884,34.680,Palmachim Airbase, Israel
+SVOBO,20,51.767,128.117,Svobodny Cosmodrome, Russia
+SEMLS,18,34.900,117.700,Semnan Launch Site, Iran
+SNMLP,17,-2.940,40.213,San Marco Platform, Kenya
+SMTS,12,35.234,53.921,Shahrud Missile Test Site, Iran
+SUBL,11,69.000,35.000,Submarine Launch (Barents Sea)
+YUN,8,39.660,124.700,Sohae Satellite Launching Station, N. Korea
+KWAJ,6,9.395,167.468,Kwajalein Atoll, Marshall Islands
+WOMRA,4,-31.110,136.780,Woomera (Alt Name), Australia
+CAS,2,34.000,118.000,Chinese Air Launch (Approx)
+JJSLA,2,36.000,120.000,Jiaozhou Bay (Approx)
