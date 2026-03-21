@@ -11,27 +11,27 @@ XICLF,910,28.246,102.027,Xichang Satellite Launch Center, China
 TANSC,565,30.400,130.970,Tanegashima Space Center, Japan
 VOSTO,508,51.884,128.334,Vostochny Cosmodrome, Russia
 KYMSC,404,48.567,46.250,Kapustin Yar, Russia
-RLLB,381,-39.261,177.865,Mahia Peninsula (Rocket Lab), NZ
+RLLB,381,-39.261,177.865,Mahia Peninsula (Rocket Lab), New Zeland
 WSC,322,30.958,131.071,Uchinoura Space Center, Japan
 WLPIS,303,37.833, -75.483,Wallops Island, USA
 KSCUT,171,31.250,131.082,Kagoshima Space Center, Japan
-DLS,115,18.660,109.480,Wenchang Space Launch Site, China
-SEAL,111,0.000,-154.000,Sea Launch (Equator)
-YSLA,110,34.426,127.205,Naro Space Center, South Korea
-ERAS,94,-12.424,130.892,Equatorial Rocket Africa (Approx)
+DLS,115,19.614444,110.951111,Wenchang Space Launch Site, China
+SEAL,111,0.000,-154.000,Sea Launch, Equator
+YSLA,110,35.000000, 125.000000,Yellow Sea Launch Area, China
+ERAS,94,28.484167,-80.572500,Eastern Range Air Space, USA
 WRAS,82,-31.110,136.780,Woomera Range, Australia
-HGSTR,48,37.135,-116.064,Holloman AFB / Nevada Test Site, USA
+HGSTR,48,31.100000,-3.000000,Hamma Guira Space Track Range, Algeria
 KODAK,42,57.435,-152.340,Kodiak Launch Complex, USA
-NSC,32,36.650,126.680,Naro (Alt Name), South Korea
-SCSLA,27,33.500,130.500,South China Sea (Sea Launch China)
+NSC,32,34.431944,127.535000,Naro Space Center, South Korea
+SCSLA,27,9.3666667,119.3166667,South China Sea (Sea Launch China), China
 YAVNE,23,31.884,34.680,Palmachim Airbase, Israel
 SVOBO,20,51.767,128.117,Svobodny Cosmodrome, Russia
-SEMLS,18,34.900,117.700,Semnan Launch Site, Iran
+SEMLS,18,35.234600, 53.922100,Semnan Launch Site, Iran
 SNMLP,17,-2.940,40.213,San Marco Platform, Kenya
 SMTS,12,35.234,53.921,Shahrud Missile Test Site, Iran
-SUBL,11,69.000,35.000,Submarine Launch (Barents Sea)
-YUN,8,39.660,124.700,Sohae Satellite Launching Station, N. Korea
+SUBL,11,69.633333,37.316667,Submarine Launch (Barents Sea), Russia
+YUN,8,39.660,124.700,Sohae Satellite Launching Station, North Korea
 KWAJ,6,9.395,167.468,Kwajalein Atoll, Marshall Islands
 WOMRA,4,-31.110,136.780,Woomera (Alt Name), Australia
-CAS,2,34.000,118.000,Chinese Air Launch (Approx)
-JJSLA,2,36.000,120.000,Jiaozhou Bay (Approx)
+CAS,2,27.763333,-15.633611,Canary Islands Air Space, Spain
+JJSLA,2,33.104596,126.594683,Jeju Island Space Launch Area, South Korea
