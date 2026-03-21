@@ -1,37 +1,37 @@
 LAUNCH_SITE,count,LATITUDE,LONGITUDE,LOCATION_NAME,COUNTRY
-AFETR,13915,28.467, -80.567,Cape Canaveral, USA
-PLMSC,13623,62.926, 40.578,Plesetsk Cosmodrome, Russia
-TYMSC,12742,45.965, 63.305,Baikonur Cosmodrome, Kazakhstan
-AFWTR,12432,34.733,-120.567,Vandenberg SFB, USA
+AFETR,13944,28.467,-80.567,Cape Canaveral, USA
+PLMSC,13623,62.926,40.578,Plesetsk Cosmodrome, Russia
+TYMSC,12742,45.965,63.305,Baikonur Cosmodrome, Kazakhstan
+AFWTR,12462,34.733,-120.567,Vandenberg SFB, USA
 TAISC,6518,38.849,111.608,Taiyuan Satellite Launch Center, China
 FRGUI,2130,5.239,-52.768,Guiana Space Centre, French Guiana
-JSC,1222,41.117,100.467,Jiuquan Satellite Launch Center, China
-SRILR,1158,13.720,80.230,Satish Dhawan Space Centre, India
+JSC,1223,41.117,100.467,Jiuquan Satellite Launch Center, China
+SRILR,1158,13.72,80.23,Satish Dhawan Space Centre, India
 XICLF,910,28.246,102.027,Xichang Satellite Launch Center, China
-TANSC,565,30.400,130.970,Tanegashima Space Center, Japan
+TANSC,565,30.4,130.97,Tanegashima Space Center, Japan
 VOSTO,508,51.884,128.334,Vostochny Cosmodrome, Russia
-KYMSC,404,48.567,46.250,Kapustin Yar, Russia
+KYMSC,404,48.567,46.25,Kapustin Yar, Russia
 RLLB,381,-39.261,177.865,Mahia Peninsula (Rocket Lab), New Zeland
 WSC,322,30.958,131.071,Uchinoura Space Center, Japan
-WLPIS,303,37.833, -75.483,Wallops Island, USA
-KSCUT,171,31.250,131.082,Kagoshima Space Center, Japan
+WLPIS,303,37.833,-75.483,Wallops Island, USA
+KSCUT,171,31.25,131.082,Kagoshima Space Center, Japan
 DLS,115,19.614444,110.951111,Wenchang Space Launch Site, China
-SEAL,111,0.000,-154.000,Sea Launch, Equator
-YSLA,110,35.000000, 125.000000,Yellow Sea Launch Area, China
-ERAS,94,28.484167,-80.572500,Eastern Range Air Space, USA
-WRAS,82,-31.110,136.780,Woomera Range, Australia
-HGSTR,48,31.100000,-3.000000,Hamma Guira Space Track Range, Algeria
-KODAK,42,57.435,-152.340,Kodiak Launch Complex, USA
-NSC,32,34.431944,127.535000,Naro Space Center, South Korea
+SEAL,111,0.0,-154.0,Sea Launch, Equator
+YSLA,110,35.0,125.0,Yellow Sea Launch Area, China
+ERAS,94,28.484167,-80.5725,Eastern Range Air Space, USA
+WRAS,82,-31.11,136.78,Woomera Range, Australia
+HGSTR,48,31.1,-3.0,Hamma Guira Space Track Range, Algeria
+KODAK,42,57.435,-152.34,Kodiak Launch Complex, USA
+NSC,32,34.431944,127.535,Naro Space Center, South Korea
 SCSLA,27,9.3666667,119.3166667,South China Sea (Sea Launch China), China
-YAVNE,23,31.884,34.680,Palmachim Airbase, Israel
+YAVNE,23,31.884,34.68,Palmachim Airbase, Israel
 SVOBO,20,51.767,128.117,Svobodny Cosmodrome, Russia
-SEMLS,18,35.234600, 53.922100,Semnan Launch Site, Iran
-SNMLP,17,-2.940,40.213,San Marco Platform, Kenya
+SEMLS,18,35.2346,53.9221,Semnan Launch Site, Iran
+SNMLP,17,-2.94,40.213,San Marco Platform, Kenya
 SMTS,12,35.234,53.921,Shahrud Missile Test Site, Iran
 SUBL,11,69.633333,37.316667,Submarine Launch (Barents Sea), Russia
-YUN,8,39.660,124.700,Sohae Satellite Launching Station, North Korea
+YUN,8,39.66,124.7,Sohae Satellite Launching Station, North Korea
 KWAJ,6,9.395,167.468,Kwajalein Atoll, Marshall Islands
-WOMRA,4,-31.110,136.780,Woomera (Alt Name), Australia
+WOMRA,4,-31.11,136.78,Woomera (Alt Name), Australia
 CAS,2,27.763333,-15.633611,Canary Islands Air Space, Spain
 JJSLA,2,33.104596,126.594683,Jeju Island Space Launch Area, South Korea
