@@ -2,6 +2,7 @@ from sgp4.api import Satrec, jday
 from datetime import datetime, timedelta
 import pandas as pd
 import math
+import argparse
 
 # -------------------------
 # converter ECI -> lat/lon/alt
@@ -48,3 +49,6 @@ def do_it(file_name):
         df.to_csv("positions.csv", index=False)
 
     print("positions.csv criado ✔")
+
+if __name__ == "__main__":
+    do_it("tle.txt")
