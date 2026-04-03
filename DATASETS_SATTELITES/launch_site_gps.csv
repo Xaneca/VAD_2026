@@ -1,23 +1,23 @@
 LAUNCH_SITE,count,LATITUDE,LONGITUDE,LOCATION_NAME,COUNTRY
-AFETR,13944,28.467,-80.567,Cape Canaveral,USA
+AFETR,14002,28.467,-80.567,Cape Canaveral,USA
 PLMSC,13623,62.926,40.578,Plesetsk Cosmodrome,Russia
-TYMSC,12742,45.965,63.305,Baikonur Cosmodrome,Kazakhstan
-AFWTR,12462,34.733,-120.567,Vandenberg SFB,USA
-TAISC,6518,38.849,111.608,Taiyuan Satellite Launch Center,China
+TYMSC,12744,45.965,63.305,Baikonur Cosmodrome,Kazakhstan
+AFWTR,12513,34.733,-120.567,Vandenberg SFB,USA
+TAISC,6521,38.849,111.608,Taiyuan Satellite Launch Center,China
 FRGUI,2130,5.239,-52.768,Guiana Space Centre,French Guiana
-JSC,1223,41.117,100.467,Jiuquan Satellite Launch Center,China
+JSC,1225,41.117,100.467,Jiuquan Satellite Launch Center,China
 SRILR,1158,13.72,80.23,Satish Dhawan Space Centre,India
 XICLF,910,28.246,102.027,Xichang Satellite Launch Center,China
 TANSC,565,30.4,130.97,Tanegashima Space Center,Japan
 VOSTO,508,51.884,128.334,Vostochny Cosmodrome,Russia
 KYMSC,404,48.567,46.25,Kapustin Yar,Russia
-RLLB,381,-39.261,177.865,Mahia Peninsula (Rocket Lab),New Zeland
+RLLB,384,-39.261,177.865,Mahia Peninsula (Rocket Lab),New Zeland
 WSC,322,30.958,131.071,Uchinoura Space Center,Japan
 WLPIS,303,37.833,-75.483,Wallops Island,USA
 KSCUT,171,31.25,131.082,Kagoshima Space Center,Japan
 DLS,115,19.614444,110.951111,Wenchang Space Launch Site,China
 SEAL,111,0.0,-154.0,Sea Launch,Equator
-YSLA,110,35.0,125.0,Yellow Sea Launch Area,China
+YSLA,120,35.0,125.0,Yellow Sea Launch Area,China
 ERAS,94,28.484167,-80.5725,Eastern Range Air Space,USA
 WRAS,82,-31.11,136.78,Woomera Range,Australia
 HGSTR,48,31.1,-3.0,Hamma Guira Space Track Range,Algeria
