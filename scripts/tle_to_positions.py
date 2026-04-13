@@ -4,9 +4,8 @@ import pandas as pd
 import math
 import argparse
 
-# -------------------------
+
 # converter ECI -> lat/lon/alt
-# -------------------------
 def eci_to_llh(x,y,z):
     lon = math.degrees(math.atan2(y, x))
     lat = math.degrees(math.atan2(z, (x*x+y*y)**0.5))
