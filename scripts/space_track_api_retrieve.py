@@ -49,10 +49,12 @@ def main():
 
     if combined_df is not None:
         # Selecionar as colunas críticas para o teu 3D
+        # No teu script de download de dados:
         cols_interesse = [
             'OBJECT_NAME', 'NORAD_CAT_ID', 'INCLINATION', 'PERIOD', 
             'APOGEE', 'PERIGEE', 'RA_OF_ASC_NODE', 'ARG_OF_PERICENTER', 
-            'MEAN_ANOMALY', 'ECCENTRICITY', 'MEAN_MOTION', 'EPOCH'
+            'MEAN_ANOMALY', 'ECCENTRICITY', 'MEAN_MOTION', 'EPOCH',
+            'TLE_LINE1', 'TLE_LINE2' # <-- OBRIGATÓRIO PARA O NOVO CÁLCULO
         ]
         # Filtramos apenas as que existem (segurança)
         cols_existentes = [c for c in cols_interesse if c in combined_df.columns]
@@ -61,3 +63,6 @@ def main():
         # Guardar localmente para não teres de fazer request à API toda a hora (evita o ban)
         df_final.to_csv('../DATASETS_SATTELITES/spacetrack_last_data_tle.csv', index=False)
         print("Dados guardados em 'spacetrack_last_data_tle.csv'")
+
+if __name__ == "__main__":
+    main()
