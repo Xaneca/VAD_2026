@@ -7,6 +7,9 @@ import json
 from datetime import datetime, timedelta
 from urllib.request import urlopen
 
+from sgp4.api import Satrec, jday
+from datetime import datetime
+
 # ============================================================
 # CARREGAR DADOS
 # ============================================================
@@ -19,27 +22,41 @@ tle = pd.read_csv(f'{path}/../DATASETS_SATTELITES/merged_dataset_tle.csv')
 # ============================================================
 def prepare_3d_data(df):
     mu = 398600.4418
-    period_sec = df['PERIOD'] * 60
-    valid = (period_sec > 0) & (df['ECCENTRICITY'] < 1) & (df['ECCENTRICITY'] >= 0)
+    
+    # 1. Filtros iniciais
+    valid = (df['PERIOD'] > 0) & (df['ECCENTRICITY'] < 1) & (df['ECCENTRICITY'] >= 0)
     df = df[valid].copy()
+
+    # 2. Converter EPOCH para formato data e definir o tempo atual
+    # Usamos utcnow() porque os TLEs usam UTC
+    df['EPOCH'] = pd.to_datetime(df['EPOCH'])
+    tempo_atual = datetime.utcnow()
+    
+    # Calcular diferença de tempo em dias
+    delta_t_dias = (tempo_atual - df['EPOCH']).dt.total_seconds() / 86400.0
+
+    # 3. Propagar a Anomalia Média para o tempo atual
+    # MEAN_MOTION está em revoluções por dia. Multiplicamos por 2*pi para radianos/dia.
+    delta_m_rad = df['MEAN_MOTION'] * 2 * np.pi * delta_t_dias
+    m_anom_atual = np.radians(df['MEAN_ANOMALY']) + delta_m_rad
 
     period_sec = df['PERIOD'] * 60
     e      = df['ECCENTRICITY']
     inc    = np.radians(df['INCLINATION'])
     raan   = np.radians(df['RA_OF_ASC_NODE'])
     arg_p  = np.radians(df['ARG_OF_PERICENTER'])
-    m_anom = np.radians(df['MEAN_ANOMALY'])
 
     a = ((period_sec * np.sqrt(mu)) / (2 * np.pi))**(2/3)
 
-    x_orb = a * (np.cos(m_anom) - e)
-    y_orb = a * (np.sqrt(1 - e**2) * np.sin(m_anom))
+    # 4. Usar a nova anomalia média propagada (m_anom_atual)
+    x_orb = a * (np.cos(m_anom_atual) - e)
+    y_orb = a * (np.sqrt(1 - e**2) * np.sin(m_anom_atual))
 
     cr, sr = np.cos(raan), np.sin(raan)
     ca, sa = np.cos(arg_p), np.sin(arg_p)
     ci, si = np.cos(inc),   np.sin(inc)
 
-    df = df.copy()
+    # Cálculo do X, Y, Z (igual ao teu código)
     df['X'] = (cr*ca - sr*sa*ci)*x_orb + (-cr*sa - sr*ca*ci)*y_orb
     df['Y'] = (sr*ca + cr*sa*ci)*x_orb + (-sr*sa + cr*ca*ci)*y_orb
     df['Z'] = (sa*si)*x_orb            + (ca*si)*y_orb
@@ -93,6 +110,119 @@ def prepare_3d_data(df):
         df.loc[mask, 'CONSTELLATION'] = val
 
     df['ALTITUDE'] = (np.sqrt(df['X']**2 + df['Y']**2 + df['Z']**2) - 6371).round(0)
+    df = df.reset_index(drop=True)
+    df['IDX'] = df.index
+    return df
+
+# SEGUNDA OPÇAO COM SGP4
+def prepare_3d_data(df):
+    # 1. Limpar objetos que não tenham TLE
+    df = df.dropna(subset=['TLE_LINE1', 'TLE_LINE2']).copy()
+
+    # 2. Obter o tempo atual exato em formato Julian Date (necessário para a NASA/SGP4)
+    tempo_atual = datetime.utcnow()
+
+    df['SNAPSHOT_TIME'] = tempo_atual
+
+    jd, fr = jday(tempo_atual.year, tempo_atual.month, tempo_atual.day, 
+                  tempo_atual.hour, tempo_atual.minute, tempo_atual.second)
+
+    # Listas para guardar os resultados
+    x_list, y_list, z_list = [], [], []
+    vel_list, alt_list = [], []
+
+    # 3. A Magia: Calcular a posição real para cada satélite
+    for index, row in df.iterrows():
+        try:
+            # Carregar o satélite
+            sat = Satrec.twoline2rv(row['TLE_LINE1'], row['TLE_LINE2'])
+            
+            # e = erro (0 é bom), r = posição [x,y,z], v = velocidade [vx,vy,vz]
+            e, r, v = sat.sgp4(jd, fr)
+
+            if e == 0:
+                x_list.append(r[0])
+                y_list.append(r[1])
+                z_list.append(r[2])
+                
+                # Calcular Velocidade (km/s) e Altitude (km)
+                vel_list.append(np.sqrt(v[0]**2 + v[1]**2 + v[2]**2))
+                alt_list.append(np.sqrt(r[0]**2 + r[1]**2 + r[2]**2) - 6371.0)
+            else:
+                # Se houver erro no TLE, preenchemos com NaN
+                x_list.append(np.nan); y_list.append(np.nan); z_list.append(np.nan)
+                vel_list.append(np.nan); alt_list.append(np.nan)
+        except:
+            x_list.append(np.nan); y_list.append(np.nan); z_list.append(np.nan)
+            vel_list.append(np.nan); alt_list.append(np.nan)
+
+    # Guardar os resultados no DataFrame
+    df['X_ECI'] = x_list
+    df['Y_ECI'] = y_list
+    df['Z_ECI'] = z_list
+    df['VELOCITY'] = vel_list
+    df['ALTITUDE'] = alt_list
+
+    # Remover os satélites corrompidos
+    df = df.dropna(subset=['X_ECI', 'Y_ECI', 'Z_ECI'])
+
+    # 4. CORREÇÃO DA ROTAÇÃO DA TERRA (ECI para ECEF)
+    # A biblioteca dá-nos as coordenadas "no espaço" (ECI).
+    # Como o teu mapa Plotly não roda, temos de rodar as coordenadas do satélite 
+    # de acordo com o tempo sideral para baterem certo com os países.
+    def calculate_gmst(date_utc):
+        jd_now = pd.Timestamp(date_utc).to_julian_date()
+        d = jd_now - 2451545.0
+        gmst = 280.46061837 + 360.98564736629 * d
+        return np.radians(gmst % 360)
+
+    theta = calculate_gmst(tempo_atual)
+
+    # Rotação matemática para alinhar com os continentes
+    df['X'] = df['X_ECI'] * np.cos(theta) + df['Y_ECI'] * np.sin(theta)
+    df['Y'] = -df['X_ECI'] * np.sin(theta) + df['Y_ECI'] * np.cos(theta)
+    df['Z'] = df['Z_ECI']  # O Z (Polos) não muda com a rotação
+
+    if 'PERIOD' in df.columns:
+        df['ORBIT_TYPE'] = pd.cut(
+            df['PERIOD'],
+            bins=[0, 128, 600, 1500, 99999],
+            labels=['LEO', 'MEO', 'GEO', 'HEO']
+        ).astype(str)
+    
+    # -> Object Type (Satellite, Debris, etc)
+    type_mapping = {
+        'SATELLITE': 'Satellite', 'ROCKET BODY': 'Rocket Body', 
+        'DEBRIS': 'Debris', 'SPACE STATION': 'Space Station', 
+        'COMPONENT': 'Component', 'IN ANALYSIS': 'In Analysis', 'UNKNOWN': 'Unknown'
+    }
+    if 'OBJECT_TYPE' in df.columns:
+        df['OBJECT_TYPE'] = df['OBJECT_TYPE'].str.upper().map(type_mapping).fillna('Satellite')
+    else:
+        df['OBJECT_TYPE'] = 'Satellite'
+
+    name_upper = df['NAME'].str.upper()
+    mask_refine = df['OBJECT_TYPE'].isin(['Satellite', 'Unknown'])
+    df.loc[mask_refine & name_upper.str.contains('ISS|STATION|TIANGONG'), 'OBJECT_TYPE'] = 'Space Station'
+    df.loc[mask_refine & name_upper.str.contains(r'R/B|ROCKET|STAGE'), 'OBJECT_TYPE'] = 'Rocket Body'
+    df.loc[mask_refine & name_upper.str.contains('DEB|DEBRIS'), 'OBJECT_TYPE'] = 'Debris'
+    
+    name_upper = df['NAME'].str.upper() # Precisamos disto para o filtro não falhar
+    
+    constellation_map = {
+        'STARLINK': 'Starlink', 'ONEWEB': 'OneWeb',  'IRIDIUM': 'Iridium',
+        'GPS':      'GPS',      'GLONASS': 'GLONASS', 'GALILEO': 'Galileo',
+        'BEIDOU':   'BeiDou',   'COSMOS':  'COSMOS',  'FENGYUN': 'FengYun',
+        'GOES':     'GOES',     'NOAA':    'NOAA',    'ISS':     'ISS',
+        'HUBBLE':   'Hubble',
+    }
+    
+    df['CONSTELLATION'] = 'Other'
+    for key, val in constellation_map.items():
+        mask = name_upper.str.contains(key, na=False) & (df['CONSTELLATION'] == 'Other')
+        df.loc[mask, 'CONSTELLATION'] = val
+    # ---------------------------------------------
+
     df = df.reset_index(drop=True)
     df['IDX'] = df.index
     return df
@@ -250,6 +380,45 @@ def compute_orbit_line(row, n_points: int = 300):
     Z = np.append(Z, Z[0])
     return X.tolist(), Y.tolist(), Z.tolist()
 
+def compute_orbit_line(row, n_points: int = 300):
+    # 1. Carregar o satélite exato a partir das TLE Lines
+    sat = Satrec.twoline2rv(row['TLE_LINE1'], row['TLE_LINE2'])
+    
+    # 2. Obter o período em minutos
+    period_minutes = float(row['PERIOD'])
+    
+    # 3. Marcar o tempo inicial ("agora")
+    # tempo_atual = datetime.utcnow()
+    tempo_atual = pd.to_datetime(row['SNAPSHOT_TIME'])
+    
+    X, Y, Z = [], [], []
+    
+    # 4. Calcular 'n_points' ao longo da órbita com o SGP4
+    for i in range(n_points):
+        # Avançar o tempo (fração do período)
+        delta_minutes = (period_minutes / n_points) * i
+        t_point = tempo_atual + timedelta(minutes=delta_minutes)
+        
+        # Converter este momento para Julian Date
+        jd, fr = jday(t_point.year, t_point.month, t_point.day, 
+                      t_point.hour, t_point.minute, t_point.second + t_point.microsecond / 1e6)
+        
+        # Pedir ao SGP4 a posição ECI neste exato segundo
+        e, r, v = sat.sgp4(jd, fr)
+        
+        if e == 0:
+            X.append(r[0])
+            Y.append(r[1])
+            Z.append(r[2])
+
+    # 5. Fechar o anel perfeitamente (ligar o último ponto ao primeiro)
+    if len(X) > 0:
+        X.append(X[0])
+        Y.append(Y[0])
+        Z.append(Z[0])
+        
+    return X, Y, Z
+
 # ============================================================
 # GLOBO 3D
 # ============================================================
@@ -318,6 +487,18 @@ def build_globe_figure(df_filtered, orbit_row=None):
         lighting=dict(ambient=0.6, diffuse=0.8), name='Terra'
     ))
 
+    # 2. O traço das COSTA/PAÍSES (é aqui que mudas a espessura)
+    fig.add_trace(go.Scatter3d(
+        x=coast_x, y=coast_y, z=coast_z,
+        mode='lines',
+        line=dict(
+            color='white', # Ou a cor que preferires
+            width=5        # Aumenta este valor (ex: de 2 para 5 ou 8) para o traço ficar mais grosso
+        ),
+        hoverinfo='skip',
+        name='Fronteiras'
+    ))
+
     if coast_x is not None:
         fig.add_trace(go.Scatter3d(
             x=coast_x, y=coast_y, z=coast_z,
@@ -346,15 +527,68 @@ def build_globe_figure(df_filtered, orbit_row=None):
             )
         ))
 
+    # if orbit_row is not None:
+    #     try:
+    #         ox, oy, oz = compute_orbit_line(orbit_row)
+    #         fig.add_trace(go.Scatter3d(
+    #             x=ox, y=oy, z=oz, mode='lines',
+    #             line=dict(color='white', width=2),
+    #             name=f"Órbita: {orbit_row['NAME']}",
+    #             hoverinfo='skip', showlegend=True
+    #         ))
+    #         fig.add_trace(go.Scatter3d(
+    #             x=[float(orbit_row['X'])],
+    #             y=[float(orbit_row['Y'])],
+    #             z=[float(orbit_row['Z'])],
+    #             mode='markers',
+    #             marker=dict(size=6, color='white', symbol='diamond',
+    #                         line=dict(color='yellow', width=2)),
+    #             name='Seleccionado',
+    #             hovertemplate=f"<b>{orbit_row['NAME']}</b><extra></extra>",
+    #             showlegend=True
+    #         ))
+    #         orbit_max = max(max(abs(v) for v in ox),
+    #                         max(abs(v) for v in oy),
+    #                         max(abs(v) for v in oz)) * 1.1
+    #         max_range = max(max_range, orbit_max)
+    #     except Exception as ex:
+    #         print(f"Erro ao calcular órbita: {ex}")
+    # novo com sgp4
     if orbit_row is not None:
         try:
+            # 1. Obter a linha da órbita original (em ECI)
             ox, oy, oz = compute_orbit_line(orbit_row)
+            
+            # 2. Converter para numpy arrays para facilitar a matemática
+            import numpy as np
+            from datetime import datetime
+            import pandas as pd
+            
+            ox = np.array(ox)
+            oy = np.array(oy)
+            oz = np.array(oz)
+
+            # 3. Calcular a Rotação Atual da Terra (o mesmo theta de antes)
+            tempo_atual = datetime.utcnow()
+            jd_now = pd.Timestamp(tempo_atual).to_julian_date()
+            d = jd_now - 2451545.0
+            gmst = 280.46061837 + 360.98564736629 * d
+            theta = np.radians(gmst % 360)
+
+            # 4. Rodar a Órbita inteira para o sistema ECEF (alinhar com os países e satélites)
+            ox_ecef = ox * np.cos(theta) + oy * np.sin(theta)
+            oy_ecef = -ox * np.sin(theta) + oy * np.cos(theta)
+            oz_ecef = oz  # O Z não precisa de rodar
+
+            # 5. Desenhar a linha da Órbita Rodada
             fig.add_trace(go.Scatter3d(
-                x=ox, y=oy, z=oz, mode='lines',
+                x=ox_ecef, y=oy_ecef, z=oz_ecef, mode='lines',
                 line=dict(color='white', width=2),
                 name=f"Órbita: {orbit_row['NAME']}",
                 hoverinfo='skip', showlegend=True
             ))
+            
+            # 6. Desenhar o Ponto Selecionado (este já vem rodado do dataframe)
             fig.add_trace(go.Scatter3d(
                 x=[float(orbit_row['X'])],
                 y=[float(orbit_row['Y'])],
@@ -366,9 +600,10 @@ def build_globe_figure(df_filtered, orbit_row=None):
                 hovertemplate=f"<b>{orbit_row['NAME']}</b><extra></extra>",
                 showlegend=True
             ))
-            orbit_max = max(max(abs(v) for v in ox),
-                            max(abs(v) for v in oy),
-                            max(abs(v) for v in oz)) * 1.1
+            
+            orbit_max = max(max(abs(v) for v in ox_ecef),
+                            max(abs(v) for v in oy_ecef),
+                            max(abs(v) for v in oz_ecef)) * 1.1
             max_range = max(max_range, orbit_max)
         except Exception as ex:
             print(f"Erro ao calcular órbita: {ex}")
@@ -490,7 +725,7 @@ filter_groups = [
                  'BeiDou','COSMOS','FengYun','GOES','NOAA','ISS','Hubble','Other']},
     {'id': 'object_type', 'label': '🔷 Object Type',
      'options': ['Satellite','Debris','Rocket Body','Space Station', 'Component', 'In Analysis', 'Unknown'],
-     'default': ['Satellite','Debris','Rocket Body','Space Station', 'Component', 'In Analysis', 'Unknown']},
+     'default': ['Satellite']},
     {'id': 'altitude', 'label': '📏 Altitude (km)',
      'type': 'range', 'min': 0, 'max': 40000, 'default': [0, 40000]},
     {'id': 'inclination', 'label': '📐 Inclination (°)',
