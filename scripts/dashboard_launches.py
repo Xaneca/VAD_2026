@@ -1,10 +1,11 @@
 import dash
-from dash import dcc, html # <-- Adiciona o dcc aqui se não o tiveres
+from dash import dcc, html, Input, Output
 import plotly.graph_objects as go
 import pandas as pd
 import subprocess
 import sys
 import asyncio
+from plotly.subplots import make_subplots
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -89,7 +90,6 @@ fig_ranking.update_layout(
 # ============================================================
 # LAST LAUNCH
 # ============================================================
-# TODO
 df_merged = pd.read_csv(satellite_file)
 
 # Converter a coluna LAUNCH_DATE para um formato de data "verdadeiro" do Pandas
@@ -107,22 +107,162 @@ last_launch_date = last_launch['LAUNCH_DATE'].strftime('%Y-%m-%d') # Formatar a 
 # ============================================================
 # LAST YEAR LAUNCHES VS THIS YEAR
 # ============================================================
-# TODO
+cur_year = pd.Timestamp.now().year
+prev_year = cur_year - 1
+
+# Extrair apenas o ano da coluna LAUNCH_DATE
+df_merged['LAUNCH_YEAR'] = df_merged['LAUNCH_DATE'].dt.year
+
+# Contar quantos lançamentos existem para cada ano
+launches_this_year = len(df_merged[df_merged['LAUNCH_YEAR'] == cur_year])
+launches_last_year = len(df_merged[df_merged['LAUNCH_YEAR'] == prev_year])
 
 # ============================================================
 # 2D MAP
 # ============================================================
-# TODO
+hover_texts = df_launches['LOCATION_NAME'] + '<br>Lançamentos: ' + df_launches['count'].astype(str)
+
+fig_map = go.Figure(go.Scattergeo(
+    lon = df_launches['LONGITUDE'],
+    lat = df_launches['LATITUDE'],
+    text = hover_texts,
+    hoverinfo = 'text',
+    marker = dict(
+        size = df_launches['count'],
+        sizemode = 'area', # Faz com que a área da bolha seja proporcional ao número
+        # Matemática do Plotly para escalar o tamanho das bolhas (o 40 é o tamanho máximo)
+        sizeref = 2. * max(df_launches['count']) / (40.**2), 
+        sizemin = 3,
+        color = '#e66b8b', # Este é o tom rosa/vermelho do teu mockup
+        line_color = 'rgba(255, 255, 255, 0.8)', # Bordinha branca
+        line_width = 1,
+        opacity = 0.8
+    )
+))
+
+# Estilizar o mapa para ficar com as tuas cores (oceano escuro, continentes azul-acinzentado)
+fig_map.update_layout(
+    paper_bgcolor='rgba(0,0,0,0)', 
+    plot_bgcolor='rgba(0,0,0,0)',
+    margin=dict(l=0, r=0, t=0, b=0),
+    geo=dict(
+        bgcolor='rgba(0,0,0,0)',
+        showland=True,
+        landcolor='#253e50',      
+        showocean=True,
+        oceancolor='#10151f',     
+        showlakes=True,           # <-- ADICIONAR ESTA LINHA
+        lakecolor='#10151f',      # <-- ADICIONAR ESTA (usamos a cor do oceano)
+        showcountries=True,
+        countrycolor='#2d3748',   
+        projection_type='natural earth',
+        showframe=False,          
+        coastlinecolor='#2d3748'
+    )
+)
 
 # ============================================================
 # COUNTRY LAUNCH
 # ============================================================
-# TODO
+df_country = df_launches.groupby('COUNTRY').agg(
+    total_launches=('count', 'sum'),
+    num_sites=('LAUNCH_SITE', 'nunique')
+).reset_index()
+
+# Ordenar do maior para o menor número de lançamentos
+df_country = df_country.sort_values('total_launches', ascending=False)
+
+fig_country = make_subplots(specs=[[{"secondary_y": True}]])
+
+# Barra 1: Total Launches (A rosa/vermelha)
+fig_country.add_trace(
+    go.Bar(
+        x=df_country['COUNTRY'], 
+        y=df_country['total_launches'], 
+        name="Total launches (Log)", 
+        marker_color='#e66b8b',
+        offsetgroup=1  # <--- ADICIONAR ISTO AQUI
+    ), 
+    secondary_y=False 
+)
+
+# Barra 2: Number of Sites (A azul/cinza clara)
+fig_country.add_trace(
+    go.Bar(
+        x=df_country['COUNTRY'], 
+        y=df_country['num_sites'], 
+        name="Number of Sites (Linear)", 
+        marker_color='#8ea4b8', 
+        offsetgroup=2  # <--- E ADICIONAR ISTO AQUI
+    ), 
+    secondary_y=True 
+)
+
+# Estética Geral e Legenda no topo
+fig_country.update_layout(
+    paper_bgcolor='rgba(0,0,0,0)', 
+    plot_bgcolor='rgba(0,0,0,0)',
+    margin=dict(l=0, r=0, t=40, b=0),
+    legend=dict(
+        orientation="h",
+        yanchor="bottom", y=1.02,
+        xanchor="right", x=1,
+        font=dict(color="white")
+    ),
+    barmode='group',
+    bargap=0.3,       # Espaço entre os diferentes países (0 a 1)
+    bargroupgap=0.1   # Espaço entre a barra rosa e a azul (0 a 1)
+)
+
+# Configurar o Eixo Y Principal (Esquerda - Logarítmico)
+fig_country.update_yaxes(
+    title_text="Number of Launches", 
+    type="log", # <-- A magia da escala logarítmica!
+    color='white', 
+    showgrid=True, gridcolor='#2d3748', 
+    secondary_y=False
+)
+
+# Configurar o Eixo Y Secundário (Direita - Linear)
+fig_country.update_yaxes(
+    title_text="Number of Sites", 
+    type="linear",
+    color='white', 
+    showgrid=False, # Desligamos as linhas de fundo para não ficar confuso
+    secondary_y=True,
+    rangemode="tozero" # Força o eixo a começar no zero
+)
+
+# Configurar o Eixo X
+fig_country.update_xaxes(
+    color='white', 
+    tickangle=-45 # Inclina os nomes dos países para caberem todos
+)
 
 # ============================================================
 # LAUNCH PER YEAR
 # ============================================================
-# TODO
+df_yearly = df_merged.groupby('LAUNCH_YEAR').size().reset_index(name='launches')
+
+df_yearly = df_yearly.sort_values('LAUNCH_YEAR')
+df_yearly = df_yearly[df_yearly['LAUNCH_YEAR'] >= 1957] # inicio da era espacial
+
+fig_line = go.Figure(go.Scatter(
+    x=df_yearly['LAUNCH_YEAR'], 
+    y=df_yearly['launches'],
+    mode='lines+markers', # Mostra a linha e as "bolinhas" em cada ponto
+    line=dict(color='#00d4ff', width=3),
+    marker=dict(size=6, color='#e66b8b', line=dict(width=1, color='white')) # Pontos a cruzar as tuas duas cores principais!
+))
+
+fig_line.update_layout(
+    paper_bgcolor='rgba(0,0,0,0)', 
+    plot_bgcolor='rgba(0,0,0,0)',
+    margin=dict(l=0, r=20, t=10, b=0),
+    xaxis=dict(color='white', showgrid=False, tickformat="d"), # "d" força o Plotly a mostrar o ano sem vírgulas (ex: 2026 em vez de 2,026)
+    yaxis=dict(color='white', showgrid=True, gridcolor='#2d3748', title="Number of Launches")
+)
+
 
 # ============================================================
 # SELECT LAUNCH SITE (FILTER)
@@ -177,36 +317,120 @@ app.layout = html.Div(style={
         ]),
 
         # 3. KPI - Last 12 Months (Linha 1, Coluna 3)
-        html.Div(style={**card_style, 'gridColumn': '3', 'gridRow': '1'}, children=[
-            html.Div("launch: last 12 months vs previous year", style={'color': '#9ca3af', 'fontSize': '12px', 'marginBottom': '20px', 'textAlign': 'center'}),
+        html.Div(style={**card_style, 'gridColumn': '3', 'gridRow': '1', 'padding': '10px'}, children=[
             
-            # Colocamos os dois números lado a lado usando flexbox
-            html.Div(style={'display': 'flex', 'justifyContent': 'space-around', 'width': '100%'}, children=[
-                # Bloco Esquerdo (Last Year)
+            # Flexbox para alinhar tudo perfeitamente ao centro sem o título
+            html.Div(style={'display': 'flex', 'justifyContent': 'space-evenly', 'alignItems': 'center', 'width': '100%', 'height': '100%'}, children=[
+                
+                # Bloco Esquerdo (Ano Anterior)
                 html.Div([
-                    html.Div("50", style={'fontSize': '38px'}),
-                    html.Div("launches\nlast year", style={'color': '#9ca3af', 'fontSize': '11px', 'whiteSpace': 'pre-line'})
+                    html.Div(str(launches_last_year), style={'fontSize': '48px', 'fontWeight': 'bold', 'color': 'white'}),
+                    html.Div(f"launches\n{prev_year}", style={'color': '#9ca3af', 'fontSize': '13px', 'whiteSpace': 'pre-line', 'textTransform': 'uppercase'})
                 ]),
-                # Bloco Direito (This Year)
+                
+                # Linha divisória vertical
+                html.Div(style={'width': '1px', 'height': '60px', 'backgroundColor': '#2d3748'}),
+                
+                # Bloco Direito (Ano Atual)
                 html.Div([
-                    html.Div("27", style={'fontSize': '38px'}),
-                    html.Div("launches\nthis year", style={'color': '#9ca3af', 'fontSize': '11px', 'whiteSpace': 'pre-line'})
+                    html.Div(str(launches_this_year), style={'fontSize': '48px', 'fontWeight': 'bold', 'color': '#00d4ff'}),
+                    html.Div(f"launches\n{cur_year}", style={'color': '#9ca3af', 'fontSize': '13px', 'whiteSpace': 'pre-line', 'textTransform': 'uppercase'})
                 ])
             ])
         ]),
 
         # LINHA 2 (O mapa estica-se pelas colunas 2 e 3)
-        html.Div("2D MAP (country)", style={**card_style, 'gridColumn': '2 / 4', 'gridRow': '2', 'minHeight': '250px'}),
+        html.Div(style={**card_style, 'gridColumn': '2 / 4', 'gridRow': '2', 'padding': '15px', 'minHeight': '350px'}, children=[
+            # O Título alinhado à esquerda como no teu mockup
+            html.H3("Global Satellite Launch Sites by Volume", style={
+                'fontWeight': 'normal', 'marginBottom': '0px', 'textAlign': 'left', 
+                'width': '100%', 'paddingLeft': '10px', 'fontSize': '16px'
+            }),
+            
+            # O Gráfico
+            dcc.Graph(
+                figure=fig_map, 
+                config={'displayModeBar': True, 'scrollZoom': True}, 
+                style={'width': '100%', 'height': '100%', 'flex': '1'}
+            )
+        ]),
 
         # LINHA 3 (Gráfico de Barras estica-se por todas as 3 colunas)
-        html.Div("Country launch - num sites vs num launches", style={**card_style, 'gridColumn': '1 / 4', 'gridRow': '3', 'minHeight': '300px'}),
+        html.Div(style={**card_style, 'gridColumn': '1 / 4', 'gridRow': '3', 'minHeight': '400px'}, children=[
+            html.H3("Launch information by country", style={'fontWeight': 'normal', 'fontSize': '16px', 'marginBottom': '10px', 'textAlign': 'left', 'width': '100%'}),
+            dcc.Graph(figure=fig_country, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
+        ]),
 
         # LINHA 4
-        html.Div("Launch per year (Line Graph)", style={**card_style, 'gridColumn': '1 / 3', 'gridRow': '4', 'minHeight': '300px'}),
+        html.Div(style={**card_style, 'gridColumn': '1 / 3', 'gridRow': '4', 'minHeight': '400px', 'alignItems': 'flex-start'}, children=[
+            
+            # Título dinâmico (com ID para podermos alterá-lo)
+            html.H3(id='line-chart-title', children="Launches over the years", style={'fontWeight': 'normal', 'fontSize': '16px', 'marginBottom': '10px'}),
+            
+            # O Dropdown para filtrar
+            dcc.Dropdown(
+                id='site-dropdown',
+                # Criamos a opção "ALL" e depois juntamos todos os sites únicos do teu df_merged
+                options=[{'label': 'All Sites', 'value': 'ALL'}] + [{'label': site, 'value': site} for site in df_merged['LAUNCH_SITE'].dropna().unique()],
+                value='ALL', # Valor pré-selecionado ao abrir a página
+                clearable=False,
+                style={'width': '300px', 'color': 'black', 'marginBottom': '20px'} # Cor preta para o texto se ler no fundo branco do dropdown
+            ),
+            
+            # O espaço vazio para o Gráfico (com ID para o Callback saber para onde o enviar)
+            dcc.Graph(id='line-graph', config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
+        ]),
+
         html.Div("Select Launch Site (Filter)", style={**card_style, 'gridColumn': '3', 'gridRow': '4'}),
 
     ])
 ])
+
+# ========================================
+# CALLBACKS
+# ========================================
+
+@app.callback(
+    Output('line-graph', 'figure'),
+    Output('line-chart-title', 'children'),
+    Input('site-dropdown', 'value')
+)
+def update_line_chart(selected_site):
+    # 1. Filtrar os dados com base na escolha
+    if selected_site == 'ALL':
+        df_filtered = df_merged
+        title = "Launches over the years: All Sites"
+    else:
+        df_filtered = df_merged[df_merged['LAUNCH_SITE'] == selected_site]
+        title = f"Launches over the years: {selected_site}"
+        
+    # 2. Agrupar por ano (usando os dados filtrados)
+    df_yearly = df_filtered.groupby('LAUNCH_YEAR').size().reset_index(name='launches')
+    df_yearly = df_yearly[df_yearly['LAUNCH_YEAR'] >= 1957].sort_values('LAUNCH_YEAR')
+    
+    # 3. Desenhar a linha suave
+    fig = go.Figure(go.Scatter(
+        x=df_yearly['LAUNCH_YEAR'], 
+        y=df_yearly['launches'],
+        mode='lines+markers', # <-- MUDAR AQUI: adicionar '+markers'
+        line=dict(color='#4a6fa5', width=3, shape='spline'), 
+        marker=dict(size=6, color='#e66b8b', line=dict(width=1, color='white')) # <-- ADICIONAR AQUI: o estilo dos pontos
+    ))
+    
+    # 4. Configurar a escala Logarítmica
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=0, r=20, t=10, b=0),
+        xaxis=dict(color='white', showgrid=False, tickformat="d", title="Year"),
+        yaxis=dict(
+            color='white', 
+            showgrid=True, gridcolor='#2d3748', 
+            title="Number of Launches (Log)", 
+            type='log' # type='log' faz a magia dos 10, 100, 1000
+        )
+    )
+    
+    return fig, title
 
 if __name__ == '__main__':
     args = sys.argv[1:]  # Pega os argumentos passados na linha de comando, ignorando o nome do script
