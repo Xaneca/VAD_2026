@@ -12,6 +12,7 @@ from urllib.request import urlopen
 # ============================================================
 path = '.'
 tle = pd.read_csv(f'{path}/../DATASETS_SATTELITES/spacetrack_last_data_tle.csv')
+tle = pd.read_csv(f'{path}/../DATASETS_SATTELITES/merged_dataset_tle.csv')
 
 # ============================================================
 # PREPARAR DADOS 3D
@@ -51,15 +52,32 @@ def prepare_3d_data(df):
         labels=['LEO', 'MEO', 'GEO', 'HEO']
     ).astype(str)
 
-    name_upper = df['OBJECT_NAME'].str.upper()
+    name_upper = df['NAME'].str.upper()
     conditions = [
         name_upper.str.contains('DEB|DEBRIS', na=False),
         name_upper.str.contains(r'R/B|ROCKET', na=False),
         name_upper.str.contains('ISS|STATION', na=False),
     ]
-    df['OBJECT_TYPE'] = np.select(conditions,
-                                   ['Debris', 'Rocket Body', 'Space Station'],
-                                   default='Satellite')
+    
+    type_mapping = {
+        'SATELLITE': 'Satellite',
+        'ROCKET BODY': 'Rocket Body',
+        'DEBRIS': 'Debris',
+        'SPACE STATION': 'Space Station',
+        'COMPONENT': 'Component',
+        'IN ANALYSIS': 'In Analysis',
+        'UNKNOWN': 'Unknown'
+    }
+
+    df['OBJECT_TYPE'] = df['OBJECT_TYPE'].str.upper().map(type_mapping).fillna('Satellite')
+
+    # Refinar apenas se o tipo for Unknown ou Satellite usando o nome
+    name_upper = df['NAME'].str.upper()
+    mask_refine = df['OBJECT_TYPE'].isin(['Satellite', 'Unknown'])
+
+    df.loc[mask_refine & name_upper.str.contains('ISS|STATION|TIANGONG'), 'OBJECT_TYPE'] = 'Space Station'
+    df.loc[mask_refine & name_upper.str.contains(r'R/B|ROCKET|STAGE'), 'OBJECT_TYPE'] = 'Rocket Body'
+    df.loc[mask_refine & name_upper.str.contains('DEB|DEBRIS'), 'OBJECT_TYPE'] = 'Debris'
 
     constellation_map = {
         'STARLINK': 'Starlink', 'ONEWEB': 'OneWeb',  'IRIDIUM': 'Iridium',
@@ -193,7 +211,7 @@ def run_live_conjunction_analysis(
         row = candidates.iloc[i]
         t_offset = timedelta(minutes=float(min_dist_idx[i]) * step_minutes)
         records.append({
-            'NAME':        str(row['OBJECT_NAME']),
+            'NAME':        str(row['NAME']),
             'NORAD_ID':    int(row['NORAD_CAT_ID']),
             'MIN_DIST_KM': round(float(min_dist_val[i]), 2),
             'TIME_UTC':    (now_utc + t_offset).strftime('%Y-%m-%d %H:%M'),
@@ -276,6 +294,9 @@ COLOR_MAP = {
     'Debris':        '#8B0000',
     'Rocket Body':   '#F08080',
     'Space Station': '#1E90FF',
+    'Component':     '#FFD700',
+    'In Analysis':   '#FFA500',
+    'Unknown':       '#A9A9A9'
 }
 
 def build_globe_figure(df_filtered, orbit_row=None):
@@ -313,7 +334,7 @@ def build_globe_figure(df_filtered, orbit_row=None):
             x=sub['X'], y=sub['Y'], z=sub['Z'],
             mode='markers', name=obj_type,
             marker=dict(size=2, color=color, opacity=0.75),
-            customdata=sub[['IDX','OBJECT_NAME','ALTITUDE','ORBIT_TYPE',
+            customdata=sub[['IDX','NAME','ALTITUDE','ORBIT_TYPE',
                              'CONSTELLATION','INCLINATION','PERIOD',
                              'NORAD_CAT_ID']].values,
             hovertemplate=(
@@ -331,7 +352,7 @@ def build_globe_figure(df_filtered, orbit_row=None):
             fig.add_trace(go.Scatter3d(
                 x=ox, y=oy, z=oz, mode='lines',
                 line=dict(color='white', width=2),
-                name=f"Órbita: {orbit_row['OBJECT_NAME']}",
+                name=f"Órbita: {orbit_row['NAME']}",
                 hoverinfo='skip', showlegend=True
             ))
             fig.add_trace(go.Scatter3d(
@@ -342,7 +363,7 @@ def build_globe_figure(df_filtered, orbit_row=None):
                 marker=dict(size=6, color='white', symbol='diamond',
                             line=dict(color='yellow', width=2)),
                 name='Seleccionado',
-                hovertemplate=f"<b>{orbit_row['OBJECT_NAME']}</b><extra></extra>",
+                hovertemplate=f"<b>{orbit_row['NAME']}</b><extra></extra>",
                 showlegend=True
             ))
             orbit_max = max(max(abs(v) for v in ox),
@@ -468,8 +489,8 @@ filter_groups = [
      'default': ['Starlink','OneWeb','Iridium','GPS','GLONASS','Galileo',
                  'BeiDou','COSMOS','FengYun','GOES','NOAA','ISS','Hubble','Other']},
     {'id': 'object_type', 'label': '🔷 Object Type',
-     'options': ['Satellite','Debris','Rocket Body','Space Station'],
-     'default': ['Satellite','Debris','Rocket Body','Space Station']},
+     'options': ['Satellite','Debris','Rocket Body','Space Station', 'Component', 'In Analysis', 'Unknown'],
+     'default': ['Satellite','Debris','Rocket Body','Space Station', 'Component', 'In Analysis', 'Unknown']},
     {'id': 'altitude', 'label': '📏 Altitude (km)',
      'type': 'range', 'min': 0, 'max': 40000, 'default': [0, 40000]},
     {'id': 'inclination', 'label': '📐 Inclination (°)',
@@ -881,7 +902,7 @@ def update_globe(n_clicks, selected_idx,
             ], style={'textAlign': 'center', 'minWidth': '80px'})
 
         info_children = [
-            html.Div(orbit_row['OBJECT_NAME'],
+            html.Div(orbit_row['NAME'],
                      style={'color': 'white', 'fontSize': '14px', 'fontWeight': 'bold',
                             'marginRight': '20px', 'alignSelf': 'center'}),
             kpi('Altitude',    f"{orbit_row['ALTITUDE']:.0f} km"),
@@ -919,7 +940,7 @@ def toggle_modal(open_clicks, close_clicks, selected_idx, current_style):
     if trigger == 'check-conjunctions-btn' and open_clicks:
         title = 'Análise de Conjunções'
         if selected_idx is not None and selected_idx in df_3d.index:
-            title = f"Risco de Colisão — {df_3d.loc[selected_idx, 'OBJECT_NAME']}"
+            title = f"Risco de Colisão — {df_3d.loc[selected_idx, 'NAME']}"
         return {**current_style, 'display': 'flex'}, title
 
     return current_style, dash.no_update
