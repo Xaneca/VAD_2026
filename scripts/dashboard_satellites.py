@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, Input, Output, State, dash_table
+from dash import dcc, html, Input, Output, State, dash_table, callback
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
@@ -13,8 +13,10 @@ from sgp4.api import Satrec, jday, SatrecArray
 # CARREGAR DADOS
 # ============================================================
 path = '.'
-# Ajusta os caminhos se necessário
-tle = pd.read_csv(f'{path}/../DATASETS_SATTELITES/merged_dataset_tle.csv')
+tle = pd.read_csv(f'{path}/DATASETS_SATTELITES/spacetrack_last_data_tle.csv')
+tle = pd.read_csv(f'{path}/DATASETS_SATTELITES/merged_dataset_tle.csv')
+
+dash.register_page(__name__, name='Satellites', path='/satellites')
 
 # ============================================================
 # PREPARAR DADOS 3D (Versão SGP4 ECI para ECEF)
@@ -767,7 +769,7 @@ app.layout = html.Div(style={
 # ============================================================
 for group in filter_groups:
     gid = group['id']
-    @app.callback(
+    @callback(
         Output(f'collapse-{gid}', 'style'),
         Output(f'arrow-{gid}', 'children'),
         Input(f'toggle-{gid}', 'n_clicks'),

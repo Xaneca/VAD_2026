@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, Input, Output
+from dash import html, dcc, callback, Input, Output
 import plotly.graph_objects as go
 import pandas as pd
 import subprocess
@@ -11,9 +11,10 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # FILES
-launch_file = "../DATASETS_SATTELITES/launch_site_gps.csv"
-satellite_file = "../DATASETS_SATTELITES/merged_dataset.csv"
+launch_file = "./DATASETS_SATTELITES/launch_site_gps.csv"
+satellite_file = "./DATASETS_SATTELITES/merged_dataset.csv"
 
+dash.register_page(__name__, name='Launches', path='/launches')
 
 def executar_pipeline():
     # 1. Correr o Jupyter Notebook
@@ -51,6 +52,18 @@ card_style = {
     'textAlign': 'center',
     # Um pequeno sombreado para dar profundidade
     'boxShadow': '0 4px 6px rgba(0, 0, 0, 0.3)' 
+}
+
+button_style = {
+    'padding': '6px 16px',
+    'borderRadius': '20px',
+    'fontSize': '13px',
+    'fontWeight': '500',
+    'textDecoration': 'none',  # 👈 Remove o sublinhado do texto
+    'display': 'inline-block',
+    'backgroundColor': COLORS['card'], # Cor passiva (exemplo)
+    'color': '#9ca3af',
+    'border': '1px solid #374151',
 }
 
 # ============================================================
@@ -274,17 +287,30 @@ fig_line.update_layout(
 # ============================================================
 app = dash.Dash(__name__)
 
-app.layout = html.Div(style={
-    'backgroundColor': COLORS['background'],
-    'minHeight': '100vh',
-    'padding': '30px',
-    'fontFamily': 'Arial, sans-serif'
-}, children=[
+layout = html.Div(style={
+        'backgroundColor': COLORS['background'],
+        'minHeight': '100vh',
+        'padding': '30px',
+        'fontFamily': 'Arial, sans-serif'
+    }, children=[
     
     # BOTOES DE NAVEGAÇÃO (Topo Direita)
-    html.Div(style={'display': 'flex', 'justifyContent': 'flex-end', 'marginBottom': '20px', 'gap': '10px'}, children=[
-        html.Button('orbit', style={'backgroundColor': '#253e50', 'color': 'white', 'border': 'none', 'padding': '8px 20px', 'borderRadius': '20px'}),
-        html.Button('launch', style={'backgroundColor': '#4a6fa5', 'color': 'white', 'border': 'none', 'padding': '8px 20px', 'borderRadius': '20px'}),
+    html.Div(style={
+        'display': 'flex', 
+        'justifyContent': 'flex-end',  # Alinha os botões à direita
+        'width': '100%', 
+        'marginBottom': '10px'         # Margem sutil antes de começarem os gráficos
+    }, children=[
+        html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
+            dcc.Link(
+                html.Button("satellites", style=button_style),
+                href="/satellites"
+            ),
+            dcc.Link(
+                html.Button("launch", style=button_style), 
+                href="/launches"
+            )
+        ])
     ]),
 
     # O NOSSO GRID PRINCIPAL
@@ -390,7 +416,7 @@ app.layout = html.Div(style={
 # CALLBACKS
 # ========================================
 
-@app.callback(
+@callback(
     Output('line-graph', 'figure'),
     Output('line-chart-title', 'children'),
     Input('site-dropdown', 'value')
