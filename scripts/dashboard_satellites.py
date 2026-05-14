@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, Input, Output, State, dash_table
+from dash import dcc, html, Input, Output, State, dash_table, callback
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
@@ -14,8 +14,10 @@ from datetime import datetime
 # CARREGAR DADOS
 # ============================================================
 path = '.'
-tle = pd.read_csv(f'{path}/../DATASETS_SATTELITES/spacetrack_last_data_tle.csv')
-tle = pd.read_csv(f'{path}/../DATASETS_SATTELITES/merged_dataset_tle.csv')
+tle = pd.read_csv(f'{path}/DATASETS_SATTELITES/spacetrack_last_data_tle.csv')
+tle = pd.read_csv(f'{path}/DATASETS_SATTELITES/merged_dataset_tle.csv')
+
+dash.register_page(__name__, name='Satellites', path='/satellites')
 
 # ============================================================
 # PREPARAR DADOS 3D
@@ -706,10 +708,24 @@ card_style = {
     'padding': '10px', 'display': 'flex',
     'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'
 }
+
 button_style = {
     'backgroundColor': COLORS['card'], 'color': COLORS['text'],
     'border': 'none', 'borderRadius': '20px',
-    'padding': '8px 20px', 'cursor': 'pointer', 'fontSize': '14px'
+    'textDecoration': 'none',
+    'padding': '8px 20px', 'cursor': 'pointer', 'fontSize': '14px',
+}
+
+button_style = {
+    'padding': '6px 16px',
+    'borderRadius': '20px',
+    'fontSize': '13px',
+    'fontWeight': '500',
+    'textDecoration': 'none',  # 👈 Remove o sublinhado do texto
+    'display': 'inline-block',
+    'backgroundColor': COLORS['card'], # Cor passiva (exemplo)
+    'color': '#9ca3af',
+    'border': '1px solid #374151',
 }
 
 # ============================================================
@@ -834,14 +850,32 @@ app.index_string = '''
 # ============================================================
 # LAYOUT
 # ============================================================
-app.layout = html.Div(style={
-    'backgroundColor': COLORS['background'],
-    'minHeight': '100vh', 'padding': '15px',
-    'fontFamily': 'Arial, sans-serif', 'boxSizing': 'border-box'
-}, children=[
+layout = html.Div(style={
+        'backgroundColor': COLORS['background'],
+        'minHeight': '100vh', 'padding': '15px',
+        'fontFamily': 'Arial, sans-serif', 'boxSizing': 'border-box'
+    }, children=[
 
     dcc.Store(id='selected-object-idx', data=None),
     dcc.Store(id='selected-norad-id',   data=None),
+
+    html.Div(style={
+        'display': 'flex', 
+        'justifyContent': 'flex-end',  # Alinha os botões à direita
+        'width': '100%', 
+        'marginBottom': '10px'         # Margem sutil antes de começarem os gráficos
+    }, children=[
+        html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
+            dcc.Link(
+                html.Button("satellites", style=button_style),
+                href="/satellites"
+            ),
+            dcc.Link(
+                html.Button("launch", style=button_style), 
+                href="/launches"
+            )
+        ])
+    ]),
 
     html.Div(style={
         'display': 'grid',
@@ -849,7 +883,6 @@ app.layout = html.Div(style={
         'gridTemplateRows': '220px 80px minmax(450px, 1fr) auto 200px',
         'gap': '15px', 'width': '100%',
     }, children=[
-
         # ── Linha 1 ──────────────────────────────────────────
         html.Div(style={**card_style, 'gridColumn': '1 / 3', 'gridRow': '1'}, children=[
             dcc.Graph(figure=fig_type_object, config={'displayModeBar': False},
@@ -860,11 +893,7 @@ app.layout = html.Div(style={
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between',
                             'alignItems': 'center', 'width': '100%', 'marginBottom': '10px'}, children=[
                 html.Div('TOP CONSTELLATIONS', style={'color': COLORS['text'],
-                                                       'fontSize': '14px', 'fontWeight': 'bold'}),
-                html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
-                    html.Button('orbit',        style=button_style),
-                    html.Button('constellation', style={**button_style, 'backgroundColor': '#2d3748'})
-                ])
+                                                       'fontSize': '14px', 'fontWeight': 'bold'})
             ]),
             dcc.Graph(figure=fig_bar, config={'displayModeBar': False},
                       style={'width': '100%', 'height': '100%', 'flex': '1'})
@@ -1066,7 +1095,7 @@ app.layout = html.Div(style={
 # ============================================================
 for group in filter_groups:
     gid = group['id']
-    @app.callback(
+    @callback(
         Output(f'collapse-{gid}', 'style'),
         Output(f'arrow-{gid}', 'children'),
         Input(f'toggle-{gid}', 'n_clicks'),
@@ -1081,7 +1110,7 @@ for group in filter_groups:
 # ============================================================
 # CALLBACK — Capturar click no globo
 # ============================================================
-@app.callback(
+@callback(
     Output('selected-object-idx', 'data'),
     Output('selected-norad-id',   'data'),
     Input('globe-3d', 'clickData'),
@@ -1102,7 +1131,7 @@ def store_click(click_data):
 # ============================================================
 # CALLBACK — Actualizar globo + info bar
 # ============================================================
-@app.callback(
+@callback(
     Output('globe-3d',      'figure'),
     Output('selected-info', 'children'),
     Input('apply-filters',        'n_clicks'),
@@ -1157,7 +1186,7 @@ def update_globe(n_clicks, selected_idx,
 # ============================================================
 # CALLBACK — Abrir / fechar modal
 # ============================================================
-@app.callback(
+@callback(
     Output('conjunction-modal', 'style'),
     Output('modal-title',       'children'),
     Input('check-conjunctions-btn', 'n_clicks'),
@@ -1183,7 +1212,7 @@ def toggle_modal(open_clicks, close_clicks, selected_idx, current_style):
 # ============================================================
 # CALLBACK — Calcular tabela de conjunções
 # ============================================================
-@app.callback(
+@callback(
     Output('conjunction-table', 'data'),
     Input('check-conjunctions-btn',  'n_clicks'),
     Input('conjunction-days-slider', 'value'),
