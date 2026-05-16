@@ -304,7 +304,7 @@ layout = html.Div(style={
         html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
             dcc.Link(
                 html.Button("satellites", style=button_style),
-                href="/satellites"
+                href="/"
             ),
             dcc.Link(
                 html.Button("launch", style=button_style), 

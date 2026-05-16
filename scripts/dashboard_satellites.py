@@ -12,8 +12,10 @@ from sgp4.api import Satrec, jday, SatrecArray
 # ============================================================
 # CARREGAR DADOS
 # ============================================================
-path = '../DATASETS_SATTELITES'
-tle = pd.read_csv(f'{path}/merged_dataset_tle.csv')
+path = '.'
+tle = pd.read_csv(f'{path}/DATASETS_SATTELITES/merged_dataset_tle.csv')
+
+dash.register_page(__name__, name='Satellites', path='/')
 
 # ============================================================
 # PREPARAR DADOS 3D (Versão SGP4 ECI para ECEF)
@@ -595,7 +597,19 @@ fig_pct.update_layout(
 
 COLORS = {'background': '#0d1421', 'card': '#1a2332', 'border': '#2d3748', 'text': '#ffffff', 'accent': '#4a6fa5'}
 card_style = {'backgroundColor': COLORS['card'], 'borderRadius': '15px', 'padding': '10px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'}
-button_style = {'backgroundColor': COLORS['card'], 'color': COLORS['text'], 'border': 'none', 'borderRadius': '20px', 'padding': '8px 20px', 'cursor': 'pointer', 'fontSize': '14px'}
+# button_style = {'backgroundColor': COLORS['card'], 'color': COLORS['text'], 'border': 'none', 'borderRadius': '20px', 'padding': '8px 20px', 'cursor': 'pointer', 'fontSize': '14px'}
+
+button_style = {
+    'padding': '6px 16px',
+    'borderRadius': '20px',
+    'fontSize': '13px',
+    'fontWeight': '500',
+    'textDecoration': 'none',  # 👈 Remove o sublinhado do texto
+    'display': 'inline-block',
+    'backgroundColor': COLORS['card'], # Cor passiva (exemplo)
+    'color': '#9ca3af',
+    'border': '1px solid #374151',
+}
 
 filter_groups = [
     {'id': 'orbit',   'label': '🛸 Orbit Type', 'options': ['LEO','MEO','GEO','HEO'], 'default': ['LEO','MEO','GEO','HEO']},
@@ -684,7 +698,7 @@ app.index_string = '''
 # ============================================================
 # LAYOUT
 # ============================================================
-app.layout = html.Div(style={
+layout = html.Div(style={
     'backgroundColor': COLORS['background'], 'minHeight': '100vh', 'padding': '15px',
     'fontFamily': 'Arial, sans-serif', 'boxSizing': 'border-box'
 }, children=[
@@ -701,6 +715,24 @@ app.layout = html.Div(style={
     dcc.Interval(id='live-update-interval', interval=2000, n_intervals=0),
 
     html.Div(style={
+        'display': 'flex', 
+        'justifyContent': 'flex-end',  # Alinha os botões à direita
+        'width': '100%', 
+        'marginBottom': '10px'         # Margem sutil antes de começarem os gráficos
+    }, children=[
+        html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
+            dcc.Link(
+                html.Button("satellites", style=button_style),
+                href="/"
+            ),
+            dcc.Link(
+                html.Button("launch", style=button_style), 
+                href="/launches"
+            )
+        ])
+    ]),
+
+    html.Div(style={
         'display': 'grid',
         'gridTemplateColumns': '1fr 1fr 1.5fr 280px',
         'gridTemplateRows': '220px 80px 650px 200px',
@@ -713,10 +745,6 @@ app.layout = html.Div(style={
         html.Div(style={**card_style, 'gridColumn': '3 / 5', 'gridRow': '1', 'justifyContent': 'space-between', 'padding': '15px'}, children=[
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center', 'width': '100%', 'marginBottom': '10px'}, children=[
                 html.Div('TOP CONSTELLATIONS', style={'color': COLORS['text'], 'fontSize': '14px', 'fontWeight': 'bold'}),
-                html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
-                    html.Button('orbit',         style=button_style),
-                    html.Button('constellation', style={**button_style, 'backgroundColor': '#2d3748'})
-                ])
             ]),
             dcc.Graph(figure=fig_bar, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
@@ -966,7 +994,7 @@ for group in filter_groups:
 
 
 # --- Click no globo ---
-@app.callback(
+@callback(
     Output('selected-object-idx', 'data'),
     Output('selected-norad-id',   'data'),
     Input('globe-3d', 'clickData'),
@@ -984,7 +1012,7 @@ def store_click(click_data):
 
 
 # --- Label do slider de tempo ---
-@app.callback(
+@callback(
     Output('time-travel-label', 'children'),
     Input('time-travel-slider', 'value')
 )
@@ -1005,7 +1033,7 @@ def update_time_label(hours):
 
 
 # --- Globo principal ---
-@app.callback(
+@callback(
     Output('globe-3d', 'figure'),
     Output('satellite-data-container', 'children'),
     Output('check-conjunctions-btn', 'style'),
@@ -1085,7 +1113,7 @@ def update_globe(n_intervals, apply_clicks, selected_idx, close_clicks, time_off
 
 
 # --- Modal abertura/fecho ---
-@app.callback(
+@callback(
     Output('conjunction-modal', 'style'),
     Output('modal-title',       'children'),
     Input('check-conjunctions-btn', 'n_clicks'),
@@ -1107,7 +1135,7 @@ def toggle_modal(open_clicks, close_clicks, selected_idx, current_style):
 
 
 # --- Tabela de conjunções ---
-@app.callback(
+@callback(
     Output('conjunction-table',     'data'),
     Output('conj-table-data-store', 'data'),
     Input('check-conjunctions-btn',  'n_clicks'),
@@ -1136,7 +1164,7 @@ def update_conjunction_table(open_clicks, days, norad_id):
 
 
 # --- Botão "Ver Órbitas" aparece quando há linha selecionada ---
-@app.callback(
+@callback(
     Output('view-conj-orbits-btn', 'style'),
     Input('conjunction-table', 'selected_rows'),
     State('conj-table-data-store', 'data'),
@@ -1156,7 +1184,7 @@ def show_view_orbits_btn(selected_rows, table_data):
 
 
 # --- Activar visualização de conjunção (fechar modal e mostrar overlay) ---
-@app.callback(
+@callback(
     Output('conjunction-modal',   'style', allow_duplicate=True),
     Output('conj-view-active',    'data'),
     Output('conj-primary-norad',  'data'),
@@ -1181,7 +1209,7 @@ def activate_conj_view(n_clicks, selected_rows, table_data, primary_norad, modal
 
 
 # --- Construir o globo de conjunção e controlar overlay ---
-@app.callback(
+@callback(
     Output('conj-orbit-overlay',  'style'),
     Output('globe-conjunction',   'figure'),
     Output('conj-orbit-title',    'children'),
@@ -1245,7 +1273,7 @@ def render_conj_orbit_view(is_active, back_clicks, close_clicks,
 
 
 # --- "Voltar à Tabela": reabre o modal ---
-@app.callback(
+@callback(
     Output('conjunction-modal', 'style', allow_duplicate=True),
     Output('conj-view-active',  'data',  allow_duplicate=True),
     Input('conj-back-btn', 'n_clicks'),
