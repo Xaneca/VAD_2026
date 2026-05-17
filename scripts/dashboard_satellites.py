@@ -112,7 +112,7 @@ SAT_ARRAY = SatrecArray(lista_satrecs)
 print("✅ SatrecArray criado com sucesso para o Live Update.")
 
 # ============================================================
-# CACHE E CÁLCULO DE CONJUNÇÕES
+# CACHE E CÁLCULO DE CONJUNÇÕES (SGP4 real)
 # ============================================================
 _CONJ_CACHE = None
 
@@ -135,43 +135,24 @@ def _get_cache(df):
         print(f"✅ Cache pronta: {len(_CONJ_CACHE):,} objectos.")
     return _CONJ_CACHE
 
-def _propagate_batch(sats_df, n_steps, step_min):
-    mu          = 398600.4418
-    M0          = np.radians(sats_df['MEAN_ANOMALY'].values)
-    mean_motion = sats_df['MEAN_MOTION'].values * 2 * np.pi / 1440.0
-    e           = sats_df['ECCENTRICITY'].values
-    inc         = np.radians(sats_df['INCLINATION'].values)
-    raan        = np.radians(sats_df['RA_OF_ASC_NODE'].values)
-    argp        = np.radians(sats_df['ARG_OF_PERICENTER'].values)
-    a           = sats_df['_A_KM'].values
-    dt  = np.arange(n_steps, dtype=np.float64) * step_min
-    M_t = M0[:, None] + mean_motion[:, None] * dt[None, :]
-    E = M_t.copy()
-    for _ in range(6):
-        E -= (E - e[:, None] * np.sin(E) - M_t) / (1.0 - e[:, None] * np.cos(E))
-    nu = 2.0 * np.arctan2(
-        np.sqrt(1.0 + e[:, None]) * np.sin(E / 2.0),
-        np.sqrt(1.0 - e[:, None]) * np.cos(E / 2.0),
-    )
-    r  = a[:, None] * (1.0 - e[:, None]**2) / (1.0 + e[:, None] * np.cos(nu))
-    xo = r * np.cos(nu); yo = r * np.sin(nu)
-    cr, sr = np.cos(raan)[:, None], np.sin(raan)[:, None]
-    ca, sa = np.cos(argp)[:, None], np.sin(argp)[:, None]
-    ci, si = np.cos(inc)[:, None],  np.sin(inc)[:, None]
-    X = (cr*ca - sr*sa*ci)*xo + (-cr*sa - sr*ca*ci)*yo
-    Y = (sr*ca + cr*sa*ci)*xo + (-sr*sa + cr*ca*ci)*yo
-    Z = (sa*si)*xo             + (ca*si)*yo
-    return X, Y, Z
 
-def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_minutes=15.0, top_n=10, buffer_km=75.0):
-    df_c            = _get_cache(tle_dataframe)
+def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_minutes=2.0, top_n=10, buffer_km=75.0):
+    """
+    Análise de conjunções usando SGP4.
+    Passo 1: Grid Grosseiro (step_minutes) para encontrar mínimas genéricas.
+    Passo 2: Grid Fino (1 segundo) para identificar o TCA exato (Time of Closest Approach).
+    """
+    df_c = _get_cache(tle_dataframe)
     target_norad_id = int(target_norad_id)
     tgt_mask = df_c['NORAD_CAT_ID'] == target_norad_id
+
     if not tgt_mask.any():
-        return pd.DataFrame(columns=['NAME','NORAD_ID','MIN_DIST_KM','TIME_UTC'])
+        return pd.DataFrame(columns=['NAME', 'NORAD_ID', 'MIN_DIST_KM', 'TIME_UTC'])
+
     tgt_row     = df_c[tgt_mask].iloc[0]
     tgt_apogee  = float(tgt_row['_APOGEE_KM'])
     tgt_perigee = float(tgt_row['_PERIGEE_KM'])
+
     cand_mask = (
         (~tgt_mask) &
         (df_c['_PERIGEE_KM'] <= tgt_apogee  + buffer_km) &
@@ -181,43 +162,122 @@ def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_m
     )
     candidates = df_c[cand_mask].copy()
     if candidates.empty:
-        return pd.DataFrame(columns=['NAME','NORAD_ID','MIN_DIST_KM','TIME_UTC'])
-    n_steps = max(1, int(days * 24 * 60 / step_minutes))
-    Xt, Yt, Zt = _propagate_batch(df_c[tgt_mask], n_steps, step_minutes)
-    Xc, Yc, Zc = _propagate_batch(candidates,     n_steps, step_minutes)
-    dist         = np.sqrt((Xc - Xt)**2 + (Yc - Yt)**2 + (Zc - Zt)**2)
-    min_dist_idx = dist.argmin(axis=1)
-    min_dist_val = dist[np.arange(len(candidates)), min_dist_idx]
-    top_idx = np.argsort(min_dist_val)[:top_n]
-    now_utc = datetime.utcnow()
+        return pd.DataFrame(columns=['NAME', 'NORAD_ID', 'MIN_DIST_KM', 'TIME_UTC'])
+
+    now_utc   = datetime.utcnow()
+    n_steps   = max(1, int(days * 24 * 60 / step_minutes))
+    step_days = step_minutes / 1440.0
+    
+    jd_base, fr_base = jday(now_utc.year, now_utc.month, now_utc.day,
+                            now_utc.hour, now_utc.minute, now_utc.second)
+    
+    # [CORREÇÃO]: Preservar o fr_base e aplicar o offset apenas à fração de dia
+    jd_arr_coarse = np.full(n_steps, jd_base)
+    fr_arr_coarse = fr_base + np.arange(n_steps) * step_days
+
+    # Propagar alvo (Coarse)
+    try:
+        tgt_sat     = Satrec.twoline2rv(tgt_row['TLE_LINE1'], tgt_row['TLE_LINE2'])
+        tgt_array   = SatrecArray([tgt_sat])
+        e_t, r_t, _ = tgt_array.sgp4(jd_arr_coarse, fr_arr_coarse)
+        r_t = r_t[0]
+        err_t = e_t[0]
+        valid_t = (err_t == 0)
+    except Exception as ex:
+        return pd.DataFrame(columns=['NAME', 'NORAD_ID', 'MIN_DIST_KM', 'TIME_UTC'])
+
+    # Propagar candidatos em batch
+    cand_satrecs  = []
+    cand_rows_out = []
+    for _, row in candidates.iterrows():
+        try:
+            sat = Satrec.twoline2rv(row['TLE_LINE1'], row['TLE_LINE2'])
+            cand_satrecs.append(sat)
+            cand_rows_out.append(row)
+        except:
+            pass
+
+    if not cand_satrecs:
+        return pd.DataFrame(columns=['NAME', 'NORAD_ID', 'MIN_DIST_KM', 'TIME_UTC'])
+
+    cand_sa = SatrecArray(cand_satrecs)
+    e_c, r_c, _ = cand_sa.sgp4(jd_arr_coarse, fr_arr_coarse)
+
     records = []
-    for i in top_idx:
-        row = candidates.iloc[i]
-        t_offset = timedelta(minutes=float(min_dist_idx[i]) * step_minutes)
+    for ci, cand_row in enumerate(cand_rows_out):
+        valid_mask = valid_t & (e_c[ci] == 0)
+        if not valid_mask.any(): continue
+
+        diff = r_c[ci][valid_mask] - r_t[valid_mask]
+        dists = np.linalg.norm(diff, axis=1)
+        min_i_valid = dists.argmin()
+        min_d_coarse = dists[min_i_valid]
+        
+        # Recuperar índice temporal exato original
+        time_idx_coarse = np.where(valid_mask)[0][min_i_valid]
+        best_fr    = fr_arr_coarse[time_idx_coarse]
+        final_dist = min_d_coarse
+
+        # [CORREÇÃO]: Passo Fino (Refinamento de 1 segundo se Risco Elevado)
+        if min_d_coarse < 200.0:  # Zoom em aproximações < 200km
+            fine_steps = 240 # +/- 2 minutos em torno do encontro grosseiro
+            fine_step_days = 1.0 / 86400.0 # 1 segundo 
+            fr_arr_fine = best_fr + (np.arange(fine_steps) - fine_steps/2) * fine_step_days
+            jd_arr_fine = np.full(fine_steps, jd_base)
+            
+            e_t_f, r_t_f, _ = tgt_array.sgp4(jd_arr_fine, fr_arr_fine)
+            cand_arr = SatrecArray([cand_satrecs[ci]])
+            e_c_f, r_c_f, _ = cand_arr.sgp4(jd_arr_fine, fr_arr_fine)
+            
+            valid_f = (e_t_f[0] == 0) & (e_c_f[0] == 0)
+            if valid_f.any():
+                diff_f = r_c_f[0][valid_f] - r_t_f[0][valid_f]
+                dists_f = np.linalg.norm(diff_f, axis=1)
+                min_i_f = dists_f.argmin()
+                
+                # Substituir pelo TCA real encontrado em precisão de 1 seg
+                final_dist = dists_f[min_i_f]
+                best_fr = fr_arr_fine[np.where(valid_f)[0][min_i_f]]
+
+        # [CORREÇÃO]: Cálculo limpo de offset para preservar precisão UTC
+        offset_days = best_fr - fr_base
+        conj_time = now_utc + timedelta(days=float(offset_days))
+
         records.append({
-            'NAME':        str(row['NAME']),
-            'NORAD_ID':    int(row['NORAD_CAT_ID']),
-            'MIN_DIST_KM': round(float(min_dist_val[i]), 2),
-            'TIME_UTC':    (now_utc + t_offset).strftime('%Y-%m-%d %H:%M'),
+            'NAME':        str(cand_row['NAME']),
+            'NORAD_ID':    int(cand_row['NORAD_CAT_ID']),
+            'MIN_DIST_KM': round(float(final_dist), 2),
+            # Guardamos os segundos de forma estrita!
+            'TIME_UTC':    conj_time.strftime('%Y-%m-%d %H:%M:%S'),
         })
-    return pd.DataFrame(records)
+
+    if not records:
+        return pd.DataFrame(columns=['NAME', 'NORAD_ID', 'MIN_DIST_KM', 'TIME_UTC'])
+
+    df_out = pd.DataFrame(records).sort_values('MIN_DIST_KM').head(top_n)
+    return df_out.reset_index(drop=True)
+
 
 # ============================================================
 # ÓRBITA COMPLETA (SGP4)
 # ============================================================
-def compute_orbit_line(row, n_points=300):
+def compute_orbit_line(row, target_time, n_points=300):
     sat = Satrec.twoline2rv(row['TLE_LINE1'], row['TLE_LINE2'])
     period_minutes = float(row['PERIOD'])
-    tempo_atual = pd.to_datetime(row['SNAPSHOT_TIME'])
     X, Y, Z = [], [], []
+    
+    # Para garantir alinhamento perfeito, começamos a linha meia órbita ANTES do momento alvo
+    start_time = target_time - timedelta(minutes=period_minutes / 2)
+    
     for i in range(n_points):
         delta_minutes = (period_minutes / n_points) * i
-        t_point = tempo_atual + timedelta(minutes=delta_minutes)
+        t_point = start_time + timedelta(minutes=delta_minutes)
         jd, fr = jday(t_point.year, t_point.month, t_point.day,
                       t_point.hour, t_point.minute, t_point.second + t_point.microsecond / 1e6)
         e, r, v = sat.sgp4(jd, fr)
         if e == 0:
             X.append(r[0]); Y.append(r[1]); Z.append(r[2])
+            
     if len(X) > 0:
         X.append(X[0]); Y.append(Y[0]); Z.append(Z[0])
     return X, Y, Z
@@ -325,15 +385,10 @@ def _eci_orbit_to_ecef(ox, oy, oz, ref_time):
     return ox_ecef, oy_ecef, oz
 
 def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_offset_hours=0):
-    """
-    Constrói o globo 3D principal.
-    time_offset_hours: deslocamento em horas (do slider de tempo) relativo a agora.
-    """
     x_e, y_e, z_e             = _EARTH_SURFACE
     coast_x, coast_y, coast_z = _COASTLINES
     max_range = 50000
 
-    # Se há offset de tempo, calculamos o instante alvo
     if time_offset_hours != 0 and orbit_row is not None:
         target_time = datetime.utcnow() + timedelta(hours=time_offset_hours)
     else:
@@ -376,8 +431,13 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
 
     if orbit_row is not None:
         try:
-            ox, oy, oz = compute_orbit_line(orbit_row)
-            ox_ecef, oy_ecef, oz_ecef = _eci_orbit_to_ecef(ox, oy, oz, datetime.utcnow())
+            # Identifica qual é o tempo que o globo está a observar (live ou com offset do slider)
+            dt_base = target_time if target_time is not None else datetime.utcnow()
+            
+            # Passa esse dt_base para o cálculo da linha e da conversão
+            ox, oy, oz = compute_orbit_line(orbit_row, dt_base)
+            ox_ecef, oy_ecef, oz_ecef = _eci_orbit_to_ecef(ox, oy, oz, dt_base)
+            
             fig.add_trace(go.Scatter3d(
                 x=ox_ecef, y=oy_ecef, z=oz_ecef, mode='lines',
                 line=dict(color='white', width=2),
@@ -385,7 +445,6 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
                 hoverinfo='skip', showlegend=True, uirevision='constant'
             ))
 
-            # Posição do satélite: com ou sem offset de tempo
             if target_time is not None:
                 pos = get_position_at_time(orbit_row, target_time)
                 if pos:
@@ -406,10 +465,9 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
         except Exception as ex:
             print(f"Erro ao calcular órbita: {ex}")
 
-    # Tempo a mostrar no relógio
     if time_offset_hours != 0:
         display_time = (datetime.utcnow() + timedelta(hours=time_offset_hours)).strftime('%Y-%m-%d %H:%M:%S')
-        clock_color  = '#ffd700'   # amarelo quando é previsão
+        clock_color  = '#ffd700'
     else:
         display_time = current_time_str
         clock_color  = 'white'
@@ -421,11 +479,9 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
     )
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        # scene=dict(xaxis=invis, yaxis=invis, zaxis=invis, bgcolor='rgba(0,0,0,0)',
-        #            aspectmode='manual', aspectratio=dict(x=1, y=1, z=1)),
         scene=dict(xaxis=invis, yaxis=invis, zaxis=invis, bgcolor='rgba(0,0,0,0)',
                    aspectmode='manual', aspectratio=dict(x=1, y=1, z=1),
-                   uirevision='manter_camara_globo'), # para o globo nao se mexer quando atualiza posiçao
+                   uirevision='manter_camara_globo'),
         legend=dict(x=0.01, y=0.99, font=dict(color='white', size=10),
                     bgcolor='rgba(0,0,0,0.5)', bordercolor='#2d3748', itemsizing='constant'),
         margin=dict(l=0, r=0, t=0, b=0), uirevision='constant', hoverdistance=50,
@@ -443,18 +499,18 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
 
 
 def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_str):
-    """
-    Constrói um globo 3D mostrando as duas órbitas (primária e secundária)
-    e as posições de ambos os satélites no instante da conjunção.
-    """
     x_e, y_e, z_e             = _EARTH_SURFACE
     coast_x, coast_y, coast_z = _COASTLINES
 
-    # Parsear o tempo da conjunção
     try:
-        conj_dt = datetime.strptime(conjunction_time_str, '%Y-%m-%d %H:%M')
+        # Tenta o novo formato completo
+        conj_dt = datetime.strptime(conjunction_time_str, '%Y-%m-%d %H:%M:%S')
     except:
-        conj_dt = datetime.utcnow()
+        try:
+            # Fallback de segurança para o formato antigo
+            conj_dt = datetime.strptime(conjunction_time_str, '%Y-%m-%d %H:%M')
+        except:
+            conj_dt = datetime.utcnow()
 
     max_range = 50000
     fig = go.Figure()
@@ -472,9 +528,10 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
             hoverinfo='skip', showlegend=False
         ))
 
-    # Órbita primária (branca)
+    # ── Para a Órbita Primária ──
     try:
-        ox, oy, oz = compute_orbit_line(primary_row)
+        # Adicionar conj_dt como segundo argumento
+        ox, oy, oz = compute_orbit_line(primary_row, conj_dt) 
         ox_e, oy_e, oz_e = _eci_orbit_to_ecef(ox, oy, oz, conj_dt)
         fig.add_trace(go.Scatter3d(
             x=ox_e, y=oy_e, z=oz_e, mode='lines',
@@ -485,9 +542,10 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
     except Exception as ex:
         print(f"Erro órbita primária: {ex}")
 
-    # Órbita secundária (laranja)
+    # ── Para a Órbita Secundária ──
     try:
-        ox2, oy2, oz2 = compute_orbit_line(secondary_row)
+        # Adicionar conj_dt como segundo argumento
+        ox2, oy2, oz2 = compute_orbit_line(secondary_row, conj_dt)
         ox2_e, oy2_e, oz2_e = _eci_orbit_to_ecef(ox2, oy2, oz2, conj_dt)
         fig.add_trace(go.Scatter3d(
             x=ox2_e, y=oy2_e, z=oz2_e, mode='lines',
@@ -498,7 +556,6 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
     except Exception as ex:
         print(f"Erro órbita secundária: {ex}")
 
-    # Posição primária no momento da conjunção (azul)
     pos1 = get_position_at_time(primary_row, conj_dt)
     if pos1:
         fig.add_trace(go.Scatter3d(
@@ -510,7 +567,6 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
             showlegend=True
         ))
 
-    # Posição secundária no momento da conjunção (laranja)
     pos2 = get_position_at_time(secondary_row, conj_dt)
     if pos2:
         fig.add_trace(go.Scatter3d(
@@ -529,11 +585,9 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
     )
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        # scene=dict(xaxis=invis, yaxis=invis, zaxis=invis, bgcolor='rgba(0,0,0,0)',
-        #            aspectmode='manual', aspectratio=dict(x=1, y=1, z=1)),
         scene=dict(xaxis=invis, yaxis=invis, zaxis=invis, bgcolor='rgba(0,0,0,0)',
                    aspectmode='manual', aspectratio=dict(x=1, y=1, z=1),
-                   uirevision='manter_camara_conjuncao'),   # para o globo nao se mexer quando atualiza posiçao
+                   uirevision='manter_camara_conjuncao'),
         legend=dict(x=0.01, y=0.99, font=dict(color='white', size=10),
                     bgcolor='rgba(0,0,0,0.5)', bordercolor='#2d3748', itemsizing='constant'),
         margin=dict(l=0, r=0, t=0, b=0), uirevision='conj-view', hoverdistance=50,
@@ -573,79 +627,48 @@ fig_bar.update_layout(
     yaxis=dict(showgrid=True, gridcolor='#2d3748', color='white', tickfont=dict(size=10))
 )
 
-# 1. Calcular a altitude de todos
 altitudes = np.sqrt(df_3d['X']**2 + df_3d['Y']**2 + df_3d['Z']**2) - 6371
 
-# Função auxiliar para amostrar no máximo 5000 pontos (evita lag no browser)
 def get_sample(mask):
     data = altitudes[mask]
     return data.sample(min(5000, len(data))) if len(data) > 0 else data
 
-# Máscaras de filtro para cada tipo de órbita (limitando a 40.000km)
 mask_all = (altitudes < 40000)
 mask_leo = (altitudes <= 2000)
 mask_meo = (altitudes > 2000) & (altitudes <= 35786)
 mask_geo = (altitudes > 35786) & (altitudes <= 40000)
 
-# Estilo base do teu violino
 v_style = dict(box_visible=True, line_color='#4a6fa5', fillcolor='#2d4a6f', opacity=0.6)
 
 fig_violin = go.Figure()
-
-# 2. Adicionar 4 "camadas" ao gráfico. Apenas a primeira ('ALL') começa ligada (visible=True)
-fig_violin.add_trace(go.Violin(y=get_sample(mask_all), visible=True, name='ALL', **v_style))
+fig_violin.add_trace(go.Violin(y=get_sample(mask_all), visible=True,  name='ALL', **v_style))
 fig_violin.add_trace(go.Violin(y=get_sample(mask_leo), visible=False, name='LEO', **v_style))
 fig_violin.add_trace(go.Violin(y=get_sample(mask_meo), visible=False, name='MEO', **v_style))
 fig_violin.add_trace(go.Violin(y=get_sample(mask_geo), visible=False, name='GEO', **v_style))
 
-# 3. Configurar Layout com os Botões Nativos
 fig_violin.update_layout(
-    paper_bgcolor='rgba(0,0,0,0)', 
-    plot_bgcolor='rgba(0,0,0,0)', 
-    margin=dict(l=35, r=10, t=35, b=10), # 't' aumentado para dar espaço aos botões
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    margin=dict(l=35, r=10, t=35, b=10),
     yaxis=dict(showgrid=True, gridcolor='#2d3748', color='white', title=dict(text='Altitude (km)', font=dict(size=10))),
     xaxis=dict(showticklabels=False),
     showlegend=False,
-    
-    # OS 4 BOTÕES INTERATIVOS
     updatemenus=[
         dict(
-            type="buttons",
-            direction="right",     
-            x=0.5, y=1.15,         
-            xanchor='center',
-            yanchor='bottom',
-            showactive=True,
+            type="buttons", direction="right",
+            x=0.5, y=1.15, xanchor='center', yanchor='bottom', showactive=True,
             buttons=list([
-                dict(
-                    label="ALL", 
-                    method="update", 
-                    args=[{"visible": [True,  False, False, False]}, 
-                          {"yaxis.autorange": True}] # O Plotly calcula sozinho
-                ),
-                dict(
-                    label="LEO", 
-                    method="update", 
-                    args=[{"visible": [False, True,  False, False]}, 
-                          {"yaxis.range": [0, 2500]}] # Focamos a câmara entre 0 e 2500 km
-                ),
-                dict(
-                    label="MEO", 
-                    method="update", 
-                    args=[{"visible": [False, False, True,  False]}, 
-                          {"yaxis.range": [2000, 36500]}] # Focamos na zona média
-                ),
-                dict(
-                    label="GEO", 
-                    method="update", 
-                    args=[{"visible": [False, False, False, True]}, 
-                          {"yaxis.range": [35000, 41000]}] # Focamos lá no alto
-                ),
+                dict(label="ALL", method="update",
+                     args=[{"visible": [True, False, False, False]}, {"yaxis.autorange": True}]),
+                dict(label="LEO", method="update",
+                     args=[{"visible": [False, True, False, False]}, {"yaxis.range": [0, 2500]}]),
+                dict(label="MEO", method="update",
+                     args=[{"visible": [False, False, True, False]}, {"yaxis.range": [2000, 36500]}]),
+                dict(label="GEO", method="update",
+                     args=[{"visible": [False, False, False, True]}, {"yaxis.range": [35000, 41000]}]),
             ]),
             font=dict(size=9, color="#00d4ff"),
-            bgcolor="#1f2937",
-            bordercolor="#4a6fa5",
-            borderwidth=1
+            bgcolor="#1f2937", bordercolor="#4a6fa5", borderwidth=1
         )
     ]
 )
@@ -674,26 +697,25 @@ fig_pct.update_layout(
 
 COLORS = {'background': '#0d1421', 'card': '#1a2332', 'border': '#2d3748', 'text': '#ffffff', 'accent': '#4a6fa5'}
 card_style = {'backgroundColor': COLORS['card'], 'borderRadius': '15px', 'padding': '10px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center', 'alignItems': 'center'}
-# button_style = {'backgroundColor': COLORS['card'], 'color': COLORS['text'], 'border': 'none', 'borderRadius': '20px', 'padding': '8px 20px', 'cursor': 'pointer', 'fontSize': '14px'}
 
 button_style = {
     'padding': '6px 16px',
     'borderRadius': '20px',
     'fontSize': '13px',
     'fontWeight': '500',
-    'textDecoration': 'none',  # 👈 Remove o sublinhado do texto
+    'textDecoration': 'none',
     'display': 'inline-block',
-    'backgroundColor': COLORS['card'], # Cor passiva (exemplo)
+    'backgroundColor': COLORS['card'],
     'color': '#9ca3af',
     'border': '1px solid #374151',
 }
 
 filter_groups = [
-    {'id': 'orbit',   'label': '🛸 Orbit Type', 'options': ['LEO','MEO','GEO','HEO'], 'default': ['LEO','MEO','GEO','HEO']},
-    {'id': 'constellation', 'label': '🌐 Constellation', 'options': ['Starlink','OneWeb','Iridium','GPS','GLONASS','Galileo','BeiDou','COSMOS','FengYun','GOES','NOAA','ISS','Hubble','Other'], 'default': ['Starlink','OneWeb','Iridium','GPS','GLONASS','Galileo','BeiDou','COSMOS','FengYun','GOES','NOAA','ISS','Hubble','Other']},
-    {'id': 'object_type', 'label': '🔷 Object Type', 'options': ['Satellite','Debris','Rocket Body','Space Station','Component','In Analysis','Unknown'], 'default': ['Satellite']},
-    {'id': 'altitude', 'label': '📏 Altitude (km)', 'type': 'range', 'min': 0, 'max': 40000, 'default': [0, 40000]},
-    {'id': 'inclination', 'label': '📐 Inclination (°)', 'type': 'range', 'min': 0, 'max': 180, 'default': [0, 180]},
+    {'id': 'orbit',        'label': '🛸 Orbit Type',      'options': ['LEO','MEO','GEO','HEO'],                                                                                           'default': ['LEO','MEO','GEO','HEO']},
+    {'id': 'constellation','label': '🌐 Constellation',    'options': ['Starlink','OneWeb','Iridium','GPS','GLONASS','Galileo','BeiDou','COSMOS','FengYun','GOES','NOAA','ISS','Hubble','Other'], 'default': ['Starlink','OneWeb','Iridium','GPS','GLONASS','Galileo','BeiDou','COSMOS','FengYun','GOES','NOAA','ISS','Hubble','Other']},
+    {'id': 'object_type',  'label': '🔷 Object Type',      'options': ['Satellite','Debris','Rocket Body','Space Station','Component','In Analysis','Unknown'],                             'default': ['Satellite']},
+    {'id': 'altitude',     'label': '📏 Altitude (km)',    'type': 'range', 'min': 0, 'max': 40000, 'default': [0, 40000]},
+    {'id': 'inclination',  'label': '📐 Inclination (°)',  'type': 'range', 'min': 0, 'max': 180,   'default': [0, 180]},
 ]
 
 def make_filter_section(group):
@@ -788,13 +810,11 @@ app.index_string = '''
             .dash-range-slider-input {
                 display: none !important;
             }
-            /* Slider de tempo no globo */
             #time-travel-slider .rc-slider-track { background-color: #ffd700 !important; }
             #time-travel-slider .rc-slider-handle { border-color: #ffd700 !important; background-color: #ffd700 !important; }
             #time-travel-slider .rc-slider-handle:hover { box-shadow: 0 0 8px rgba(255,215,0,0.6) !important; }
             #time-travel-slider .rc-slider-rail { background-color: #2d3748 !important; }
             #time-travel-slider .rc-slider-mark-text { color: #6b7280 !important; font-size: 10px !important; }
-            /* Slider de conjunções */
             #conjunction-days-slider .rc-slider-track { background-color: #4a6fa5 !important; }
             #conjunction-days-slider .rc-slider-handle { border-color: #4a6fa5 !important; background-color: #00d4ff !important; }
             #conjunction-days-slider .rc-slider-handle:hover { border-color: #00d4ff !important; box-shadow: 0 0 8px rgba(0,212,255,0.5) !important; }
@@ -807,7 +827,6 @@ app.index_string = '''
             ::-webkit-scrollbar-track { background: #0d1421; }
             ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
             ::-webkit-scrollbar-thumb:hover { background: #4a6fa5; }
-            /* Linhas clicáveis na tabela de conjunções */
             .conjunction-row-clickable:hover { background-color: #2d3748 !important; cursor: pointer; }
         </style>
     </head>
@@ -832,30 +851,23 @@ layout = html.Div(style={
     # Stores
     dcc.Store(id='selected-object-idx',    data=None),
     dcc.Store(id='selected-norad-id',      data=None),
-    # *** NOVO: stores para a visualização de conjunção ***
-    dcc.Store(id='conj-view-active',       data=False),   # está em modo conjunção?
-    dcc.Store(id='conj-primary-norad',     data=None),    # NORAD do satélite primário
-    dcc.Store(id='conj-secondary-norad',   data=None),    # NORAD do satélite secundário
-    dcc.Store(id='conj-time-str',          data=None),    # "YYYY-MM-DD HH:MM" da conjunção
-    dcc.Store(id='conj-table-data-store',  data=[]),      # guarda os dados da tabela
+    dcc.Store(id='conj-view-active',       data=False),
+    dcc.Store(id='conj-primary-norad',     data=None),
+    dcc.Store(id='conj-secondary-norad',   data=None),
+    dcc.Store(id='conj-time-str',          data=None),
+    dcc.Store(id='conj-table-data-store',  data=[]),
 
     dcc.Interval(id='live-update-interval', interval=2000, n_intervals=0),
 
     html.Div(style={
-        'display': 'flex', 
-        'justifyContent': 'flex-end',  # Alinha os botões à direita
-        'width': '100%', 
-        'marginBottom': '10px'         # Margem sutil antes de começarem os gráficos
+        'display': 'flex',
+        'justifyContent': 'flex-end',
+        'width': '100%',
+        'marginBottom': '10px'
     }, children=[
         html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
-            dcc.Link(
-                html.Button("satellites", className="nav-pill-btn"),
-                href="/"
-            ),
-            dcc.Link(
-                html.Button("launch", className="nav-pill-btn"), 
-                href="/launches"
-            )
+            dcc.Link(html.Button("satellites", className="nav-pill-btn"), href="/"),
+            dcc.Link(html.Button("launch",     className="nav-pill-btn"), href="/launches")
         ])
     ]),
 
@@ -932,7 +944,7 @@ layout = html.Div(style={
                 style={'width': '100%', 'height': '100%'}, clear_on_unhover=True
             ),
 
-            # *** NOVO: Slider de viagem no tempo — canto inferior esquerdo ***
+            # Slider de viagem no tempo
             html.Div(id='time-travel-container', style={
                 'position': 'absolute', 'bottom': '20px', 'left': '20px',
                 'backgroundColor': 'rgba(13,20,33,0.85)', 'backdropFilter': 'blur(5px)',
@@ -960,7 +972,7 @@ layout = html.Div(style={
                 ),
             ]),
 
-            # Painel de informação do satélite — canto inferior direito
+            # Painel de informação do satélite
             html.Div(id='selected-info', style={
                 'position': 'absolute', 'bottom': '20px', 'right': '20px',
                 'backgroundColor': 'rgba(26,35,50,0.85)', 'backdropFilter': 'blur(5px)',
@@ -974,37 +986,6 @@ layout = html.Div(style={
                 html.Button('🔍 Conjunctions', id='check-conjunctions-btn', n_clicks=0,
                             style={'display': 'none'})
             ]),
-
-            # *** NOVO: Overlay de visualização de conjunção (por cima do globo) ***
-            html.Div(id='conj-orbit-overlay', style={
-                'display': 'none', 'position': 'absolute', 'top': '0', 'left': '0',
-                'width': '100%', 'height': '100%', 'zIndex': '20',
-                'flexDirection': 'column'
-            }, children=[
-                # Barra de controlo superior
-                html.Div(style={
-                    'position': 'absolute', 'top': '12px', 'left': '50%',
-                    'transform': 'translateX(-50%)', 'zIndex': '30',
-                    'display': 'flex', 'gap': '10px', 'alignItems': 'center',
-                    'backgroundColor': 'rgba(13,20,33,0.9)', 'backdropFilter': 'blur(6px)',
-                    'borderRadius': '10px', 'padding': '8px 16px', 'border': '1px solid #ff6b35',
-                }, children=[
-                    html.Span(id='conj-orbit-title',
-                              style={'color': '#ff6b35', 'fontSize': '13px', 'fontWeight': 'bold', 'letterSpacing': '0.5px'}),
-                    html.Button('← Voltar à Tabela', id='conj-back-btn', n_clicks=0, style={
-                        **button_style, 'backgroundColor': '#2d3748', 'padding': '5px 14px', 'fontSize': '12px'
-                    }),
-                    html.Button('✖ Fechar', id='conj-close-btn', n_clicks=0, style={
-                        **button_style, 'backgroundColor': '#8B0000', 'padding': '5px 14px', 'fontSize': '12px'
-                    }),
-                ]),
-                # Globo de conjunção
-                dcc.Graph(
-                    id='globe-conjunction', figure=go.Figure(),
-                    config={'displayModeBar': True, 'modeBarButtonsToRemove': ['toImage'], 'scrollZoom': True},
-                    style={'width': '100%', 'height': '100%'}
-                ),
-            ]),
         ]),
 
         # Filtros
@@ -1013,7 +994,7 @@ layout = html.Div(style={
             'justifyContent': 'flex-start', 'alignItems': 'stretch',
             'padding': '15px', 'overflowY': 'auto'
         }, children=[
-            html.Div('▼ FILTERS', style={'color': COLORS['text'], 'fontSize': '15px', 'fontWeight': 'bold', 'marginBottom': '15px', 'borderBottom': '1px solid #4a6fa5', 'paddingBottom': '10px'}),
+            html.Div('FILTERS', style={'color': COLORS['text'], 'fontSize': '15px', 'fontWeight': 'bold', 'marginBottom': '15px', 'borderBottom': '1px solid #4a6fa5', 'paddingBottom': '10px'}),
             *[make_filter_section(g) for g in filter_groups],
             # html.Button('Apply Filters', id='apply-filters', n_clicks=0, style={
             #     **button_style, 'marginTop': 'auto', 'width': '100%',
@@ -1028,9 +1009,9 @@ layout = html.Div(style={
             ]),
             dcc.Graph(figure=fig_violin, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
-        html.Div(style={**card_style, 'gridColumn': '2 / 4', 'gridRow': '4', 'padding': '15px', 'display': 'flex', 'flexDirection': 'column', 'minHeight': '350px '}, children=[
+        html.Div(style={**card_style, 'gridColumn': '2 / 4', 'gridRow': '4', 'padding': '15px', 'display': 'flex', 'flexDirection': 'column', 'minHeight': '350px'}, children=[
             html.Div('CATALOG ENTRIES / YEAR', style={'color': COLORS['text'], 'fontSize': '13px', 'fontWeight': 'bold', 'marginBottom': '10px'}),
-            dcc.Graph(figure=fig_line, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%',  'flex': '1'})
+            dcc.Graph(figure=fig_line, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
 
         # Decays
@@ -1068,12 +1049,10 @@ layout = html.Div(style={
                 'color': '#00d4ff', 'marginTop': '0', 'marginBottom': '20px',
                 'fontSize': '18px', 'fontWeight': 'bold', 'letterSpacing': '0.5px'
             }),
-            # Subtítulo de instrução
             html.Div('💡 Click on a row to visualize the two orbits on the globe', style={
                 'color': '#6b7280', 'fontSize': '11px', 'marginBottom': '14px',
                 'fontStyle': 'italic'
             }),
-            # Slider de dias
             html.Div(style={'width': '100%', 'marginBottom': '28px'}, children=[
                 html.Span('Janela de Tempo (Dias):', style={
                     'color': '#9ca3af', 'fontSize': '12px', 'letterSpacing': '1px',
@@ -1085,7 +1064,6 @@ layout = html.Div(style={
                     tooltip={'always_visible': False, 'placement': 'bottom'},
                 ),
             ]),
-            # Tabela (clicável)
             dcc.Loading(color='#00d4ff', type='circle', children=[
                 dash_table.DataTable(
                     id='conjunction-table',
@@ -1097,7 +1075,7 @@ layout = html.Div(style={
                     ],
                     data=[],
                     page_size=10,
-                    row_selectable='single',   # *** NOVO: permite seleccionar linha ***
+                    row_selectable='single',
                     selected_rows=[],
                     style_table={
                         'borderRadius': '8px', 'overflow': 'hidden',
@@ -1135,7 +1113,6 @@ layout = html.Div(style={
                     style_as_list_view=True,
                 )
             ]),
-            # *** NOVO: botão "Ver Órbitas" que aparece quando há linha selecionada ***
             html.Div(style={'marginTop': '14px', 'display': 'flex', 'gap': '10px', 'justifyContent': 'flex-end'}, children=[
                 html.Button('🌍 Ver Órbitas no Globo', id='view-conj-orbits-btn', n_clicks=0, style={
                     **button_style, 'backgroundColor': '#ff6b35', 'fontWeight': 'bold',
@@ -1143,7 +1120,62 @@ layout = html.Div(style={
                 }),
             ]),
         ])
-    ])
+    ]),
+
+    # ============================================================
+    # Modal dedicado para visualização de órbitas de conjunção
+    # (janela isolada em fullscreen, sobre tudo o resto)
+    # ============================================================
+    html.Div(id='conj-orbit-modal', style={
+        'display': 'none', 'position': 'fixed', 'top': '0', 'left': '0',
+        'width': '100vw', 'height': '100vh',
+        'backgroundColor': 'rgba(0,0,0,0.92)',
+        'zIndex': '10000',
+        'justifyContent': 'center', 'alignItems': 'center',
+    }, children=[
+        html.Div(style={
+            'width': '92vw', 'height': '90vh',
+            'backgroundColor': '#0d1421',
+            'borderRadius': '16px',
+            'border': '1px solid #ff6b35',
+            'display': 'flex', 'flexDirection': 'column',
+            'overflow': 'hidden', 'position': 'relative',
+            'boxShadow': '0 0 40px rgba(255,107,53,0.25)',
+        }, children=[
+            # Barra de título do modal de órbitas
+            html.Div(style={
+                'display': 'flex', 'alignItems': 'center',
+                'justifyContent': 'space-between',
+                'padding': '12px 20px',
+                'backgroundColor': '#0d1421',
+                'borderBottom': '1px solid #ff6b35',
+                'flexShrink': '0',
+            }, children=[
+                html.Span(id='conj-orbit-title', children='',
+                          style={'color': '#ff6b35', 'fontSize': '13px',
+                                 'fontWeight': 'bold', 'letterSpacing': '0.5px',
+                                 'flex': '1', 'marginRight': '16px'}),
+                html.Div(style={'display': 'flex', 'gap': '10px', 'flexShrink': '0'}, children=[
+                    html.Button('← Voltar à Tabela', id='conj-back-btn', n_clicks=0, style={
+                        **button_style,
+                        'backgroundColor': '#2d3748',
+                        'padding': '5px 14px', 'fontSize': '12px'
+                    }),
+                    html.Button('✖ Fechar', id='conj-close-btn', n_clicks=0, style={
+                        **button_style,
+                        'backgroundColor': '#8B0000', 'color': 'white',
+                        'padding': '5px 14px', 'fontSize': '12px'
+                    }),
+                ]),
+            ]),
+            # Globo de conjunção — ocupa toda a área restante
+            dcc.Graph(
+                id='globe-conjunction', figure=go.Figure(),
+                config={'displayModeBar': True, 'modeBarButtonsToRemove': ['toImage'], 'scrollZoom': True},
+                style={'width': '100%', 'flex': '1', 'minHeight': '0'}
+            ),
+        ])
+    ]),
 ])
 
 # ============================================================
@@ -1210,7 +1242,7 @@ def update_time_label(hours):
     Output('globe-3d', 'figure'),
     Output('satellite-data-container', 'children'),
     Output('check-conjunctions-btn', 'style'),
-    Output('kpi-pct-graph', 'figure'), 
+    Output('kpi-pct-graph', 'figure'),
     Output('kpi-objects-count', 'children'),
     Output('kpi-o-count', 'children'), 
     Output('kpi-ar-count', 'children'),
@@ -1220,7 +1252,7 @@ def update_time_label(hours):
     # Input('apply-filters',        'n_clicks'),
     Input('selected-object-idx',  'data'),
     Input('close-modal-btn',      'n_clicks'),
-    Input('time-travel-slider',   'value'),       # *** NOVO ***
+    Input('time-travel-slider',   'value'),
     State('filter-orbit',         'value'),
     State('filter-constellation', 'value'),
     State('filter-object_type',   'value'),
@@ -1235,7 +1267,6 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
     ctx     = dash.callback_context
     trigger = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
 
-    # Só actualiza posições no live tick ou fecho do modal
     if trigger in ['live-update-interval', 'close-modal-btn']:
         df_3d = update_live_positions(df_3d)
 
@@ -1248,8 +1279,8 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
     if alt_range:     df_f = df_f[(df_f['ALTITUDE'] >= alt_range[0]) & (df_f['ALTITUDE'] <= alt_range[1])]
     if inc_range:     df_f = df_f[(df_f['INCLINATION'] >= inc_range[0]) & (df_f['INCLINATION'] <= inc_range[1])]
 
-    orbit_row    = None
-    btn_style    = {'display': 'none'}
+    orbit_row     = None
+    btn_style     = {'display': 'none'}
     info_children = [html.Div('Click on an object on the globe to see its orbit',
                                style={'color': '#9ca3af', 'fontSize': '13px', 'fontStyle': 'italic'})]
 
@@ -1288,24 +1319,21 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
     fig = build_globe_figure(df_f, orbit_row=orbit_row,
                              current_time_str=current_time_str,
                              time_offset_hours=time_offset)
-    
-    # DONUT GRAPH COM PERCENTAGEM DE OBJETOS E NUMERO DE OBJETOS
-    total_global = len(df_3d)
+
+    total_global   = len(df_3d)
     total_filtrado = len(df_f)
-    percentagem = (total_filtrado / total_global) * 100 if total_global > 0 else 0
+    percentagem    = (total_filtrado / total_global) * 100 if total_global > 0 else 0
 
     fig_pct_nova = go.Figure(data=[go.Pie(
         values=[total_filtrado, total_global - total_filtrado],
-        hole=0.7, 
-        marker_colors=['#00d4ff', '#2d3748'], # Azul claro para os selecionados, fundo cinza para o resto
-        textinfo='none', # Limpa o texto fora do gráfico
-        hoverinfo='skip'
+        hole=0.7,
+        marker_colors=['#00d4ff', '#2d3748'],
+        textinfo='none', hoverinfo='skip'
     )])
-    
     fig_pct_nova.update_layout(
         paper_bgcolor='rgba(0,0,0,0)', showlegend=False, margin=dict(l=0,r=0,t=0,b=0),
         annotations=[dict(
-            text=f"{percentagem:.1f}%", # 👈 É aqui que a percentagem vai para o meio do círculo!
+            text=f"{percentagem:.1f}%",
             x=0.5, y=0.5, font_size=12, font_color='white', font_weight='bold', showarrow=False
         )]
     )
@@ -1394,7 +1422,6 @@ def update_conjunction_table(open_clicks, days, norad_id):
 def show_view_orbits_btn(selected_rows, table_data):
     if selected_rows and table_data:
         row = table_data[selected_rows[0]]
-        # Não mostrar se for a linha de "órbita limpa"
         if str(row.get('NORAD_ID', '-')) == '-':
             return {'display': 'none'}
         return {
@@ -1404,88 +1431,90 @@ def show_view_orbits_btn(selected_rows, table_data):
     return {'display': 'none'}
 
 
-# --- Activar visualização de conjunção (fechar modal e mostrar overlay) ---
+# --- Activar visualização de conjunção (fechar modal de tabela e guardar stores) ---
 @callback(
-    Output('conjunction-modal',   'style', allow_duplicate=True),
-    Output('conj-view-active',    'data'),
-    Output('conj-primary-norad',  'data'),
-    Output('conj-secondary-norad','data'),
-    Output('conj-time-str',       'data'),
-    Input('view-conj-orbits-btn', 'n_clicks'),
-    State('conjunction-table',    'selected_rows'),
-    State('conj-table-data-store','data'),
-    State('selected-norad-id',    'data'),
-    State('conjunction-modal',    'style'),
+    Output('conjunction-modal',    'style', allow_duplicate=True),
+    Output('conj-view-active',     'data'),
+    Output('conj-primary-norad',   'data'),
+    Output('conj-secondary-norad', 'data'),
+    Output('conj-time-str',        'data'),
+    Input('view-conj-orbits-btn',  'n_clicks'),
+    State('conjunction-table',     'selected_rows'),
+    State('conj-table-data-store', 'data'),
+    State('selected-norad-id',     'data'),
+    State('conjunction-modal',     'style'),
     prevent_initial_call=True
 )
 def activate_conj_view(n_clicks, selected_rows, table_data, primary_norad, modal_style):
     if not n_clicks or not selected_rows or not table_data:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
-    row = table_data[selected_rows[0]]
+    row             = table_data[selected_rows[0]]
     secondary_norad = row.get('NORAD_ID')
     conj_time       = row.get('TIME_UTC')
-    # Fechar modal
     new_modal_style = {**modal_style, 'display': 'none'}
     return new_modal_style, True, primary_norad, secondary_norad, conj_time
 
 
-# --- Construir o globo de conjunção e controlar overlay ---
+# --- Construir o modal de órbitas de conjunção ---
 @callback(
-    Output('conj-orbit-overlay',  'style'),
-    Output('globe-conjunction',   'figure'),
-    Output('conj-orbit-title',    'children'),
-    Output('time-travel-slider',  'value'),        # *** Posiciona o slider na hora da conjunção ***
-    Input('conj-view-active',     'data'),
-    Input('conj-back-btn',        'n_clicks'),
-    Input('conj-close-btn',       'n_clicks'),
-    State('conj-primary-norad',   'data'),
-    State('conj-secondary-norad', 'data'),
-    State('conj-time-str',        'data'),
+    Output('conj-orbit-modal',   'style'),
+    Output('globe-conjunction',  'figure'),
+    Output('conj-orbit-title',   'children'),
+    Output('time-travel-slider', 'value'),
+    Input('conj-view-active',    'data'),
+    Input('conj-back-btn',       'n_clicks'),
+    Input('conj-close-btn',      'n_clicks'),
+    State('conj-primary-norad',  'data'),
+    State('conj-secondary-norad','data'),
+    State('conj-time-str',       'data'),
     prevent_initial_call=True
 )
 def render_conj_orbit_view(is_active, back_clicks, close_clicks,
                             primary_norad, secondary_norad, conj_time_str):
     trigger = dash.callback_context.triggered[0]['prop_id'].split('.')[0]
 
-    hidden_style = {'display': 'none', 'position': 'absolute', 'top': '0', 'left': '0',
-                    'width': '100%', 'height': '100%', 'zIndex': '20', 'flexDirection': 'column'}
-    shown_style  = {**hidden_style, 'display': 'flex'}
+    hidden_style = {
+        'display': 'none', 'position': 'fixed', 'top': '0', 'left': '0',
+        'width': '100vw', 'height': '100vh',
+        'backgroundColor': 'rgba(0,0,0,0.92)',
+        'zIndex': '10000',
+        'justifyContent': 'center', 'alignItems': 'center',
+    }
+    shown_style = {**hidden_style, 'display': 'flex'}
 
-    # Fechar / Voltar
     if trigger in ['conj-back-btn', 'conj-close-btn']:
         return hidden_style, dash.no_update, dash.no_update, 0
 
     if not is_active:
         return hidden_style, dash.no_update, dash.no_update, dash.no_update
 
-    # Calcular offset de horas da conjunção para posicionar o slider
+    # Posicionar o time-travel-slider na hora da conjunção
     slider_val = 0
     if conj_time_str:
         try:
-            conj_dt   = datetime.strptime(conj_time_str, '%Y-%m-%d %H:%M')
-            now_utc   = datetime.utcnow()
-            delta_h   = (conj_dt - now_utc).total_seconds() / 3600.0
-            slider_val = max(-72, min(72, round(delta_h)))
+            conj_dt = datetime.strptime(conj_time_str, '%Y-%m-%d %H:%M:%S')
         except:
-            slider_val = 0
+            try:
+                conj_dt = datetime.strptime(conj_time_str, '%Y-%m-%d %H:%M')
+            except:
+                conj_dt = datetime.utcnow()
+                
+        delta_h = (conj_dt - datetime.utcnow()).total_seconds() / 3600.0
+        slider_val = max(-72, min(72, round(delta_h)))
 
-    # Procurar linhas TLE dos dois satélites
     primary_rows   = tle[tle['NORAD_CAT_ID'] == int(primary_norad)]   if primary_norad   else pd.DataFrame()
     secondary_rows = tle[tle['NORAD_CAT_ID'] == int(secondary_norad)] if secondary_norad else pd.DataFrame()
 
     if primary_rows.empty or secondary_rows.empty:
         return shown_style, go.Figure(), '⚠ Dados TLE não encontrados', slider_val
 
-    primary_tle_row   = primary_rows.iloc[0]
-    secondary_tle_row = secondary_rows.iloc[0]
-
-    # Adicionar SNAPSHOT_TIME (necessário para compute_orbit_line)
     now = datetime.utcnow()
-    primary_tle_row   = primary_tle_row.copy();   primary_tle_row['SNAPSHOT_TIME']   = now
-    secondary_tle_row = secondary_tle_row.copy(); secondary_tle_row['SNAPSHOT_TIME'] = now
+    primary_tle_row             = primary_rows.iloc[0].copy()
+    secondary_tle_row           = secondary_rows.iloc[0].copy()
+    primary_tle_row['SNAPSHOT_TIME']   = now
+    secondary_tle_row['SNAPSHOT_TIME'] = now
 
-    fig = build_conjunction_orbit_figure(primary_tle_row, secondary_tle_row, conj_time_str)
-
+    fig    = build_conjunction_orbit_figure(primary_tle_row, secondary_tle_row, conj_time_str)
     p_name = str(primary_tle_row.get('NAME', primary_norad))
     s_name = str(secondary_tle_row.get('NAME', secondary_norad))
     title  = f"⚠ Conjunção: {p_name}  ↔  {s_name}  |  {conj_time_str} UTC"
@@ -1493,7 +1522,7 @@ def render_conj_orbit_view(is_active, back_clicks, close_clicks,
     return shown_style, fig, title, slider_val
 
 
-# --- "Voltar à Tabela": reabre o modal ---
+# --- "Voltar à Tabela": reabre o modal de conjunções ---
 @callback(
     Output('conjunction-modal', 'style', allow_duplicate=True),
     Output('conj-view-active',  'data',  allow_duplicate=True),
