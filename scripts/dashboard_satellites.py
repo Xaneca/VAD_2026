@@ -424,8 +424,8 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
             hovertemplate=(
                 '<b>%{customdata[1]}</b><br>'
                 'Alt: %{customdata[2]:.0f} km | Orbit: %{customdata[3]}<br>'
-                'Constelação: %{customdata[4]}<br>'
-                'Inclinação: %{customdata[5]:.1f}° | Período: %{customdata[6]:.1f} min'
+                'Constellation: %{customdata[4]}<br>'
+                'Inclination: %{customdata[5]:.1f}° | Period: %{customdata[6]:.1f} min'
                 '<extra></extra>'
             )
         ))
@@ -442,7 +442,7 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
             fig.add_trace(go.Scatter3d(
                 x=ox_ecef, y=oy_ecef, z=oz_ecef, mode='lines',
                 line=dict(color='white', width=2),
-                name=f"Órbita: {orbit_row['NAME']}",
+                name=f"Orbit: {orbit_row['NAME']}",
                 hoverinfo='skip', showlegend=True, uirevision='constant'
             ))
 
@@ -459,7 +459,7 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
                 x=[sx], y=[sy], z=[sz], mode='markers',
                 marker=dict(size=6, color='white', symbol='diamond',
                             line=dict(color='yellow', width=2)),
-                name='Seleccionado',
+                name='Selected',
                 hovertemplate=f"<b>{orbit_row['NAME']}</b><extra></extra>",
                 showlegend=True, uirevision='constant'
             ))
@@ -987,7 +987,7 @@ layout = html.Div(style={
                     # Criamos uma lista inteligente: mostra "NOME (ID)" mas guarda o INDEX do pandas!
                     options=[
                         {
-                            'label': f"🚀 {str(row['NAME'])} ({str(int(row['NORAD_CAT_ID']))})", 
+                            'label': f"{str(row['NAME'])} ({str(int(row['NORAD_CAT_ID']))})", 
                             'value': idx
                         } for idx, row in df_3d.iterrows()
                     ],
@@ -1350,10 +1350,10 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             }),
             html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr', 'gap': '12px'}, children=[
                 kpi('Altitude',    f"{orbit_row['ALTITUDE']:.0f} km"),
-                kpi('Órbita',      orbit_row['ORBIT_TYPE']),
-                kpi('Inclinação',  f"{orbit_row['INCLINATION']:.1f}°"),
-                kpi('Período',     f"{orbit_row['PERIOD']:.1f} min"),
-                kpi('Constelação', orbit_row['CONSTELLATION']),
+                kpi('Orbit',      orbit_row['ORBIT_TYPE']),
+                kpi('Inclination',  f"{orbit_row['INCLINATION']:.1f}°"),
+                kpi('Period',     f"{orbit_row['PERIOD']:.1f} min"),
+                kpi('Constellation', orbit_row['CONSTELLATION']),
                 kpi('NORAD ID',    str(int(orbit_row['NORAD_CAT_ID'])))
             ])
         ]

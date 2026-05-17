@@ -52,3 +52,41 @@
     scrollbar-width: thin;          /* Torna a barra mais fininha e elegante */
     scrollbar-color: #2d3748 #10151f; /* [Cor do manípulo] [Cor da calha] */
 }
+
+/* ============================================================
+   CUSTOMIZAÇÃO DA BARRA DE PESQUISA (Dash Dropdown Cyberpunk)
+   ============================================================ */
+
+.dash-dropdown .Select-control {
+    background-color: #10151f !important; /* Fundo escuro camuflado */
+    border: 1px solid #2d3748 !important;   /* Borda discreta */
+    border-radius: 6px !important;
+}
+
+.dash-dropdown .Select-value-label,
+.dash-dropdown .Select-placeholder,
+.dash-dropdown input {
+    color: #ffffff !important;             /* Texto em branco puro */
+}
+
+.dash-dropdown .Select-menu-outer {
+    background-color: #10151f !important; /* Fundo escuro para a lista */
+    border: 1px solid #4a6fa5 !important;   /* Borda com o azul do teu tema */
+}
+
+.dash-dropdown .Select-option {
+    background-color: #10151f !important;
+    color: #ffffff !important;
+    cursor: pointer;
+}
+
+.dash-dropdown .Select-option:hover,
+.dash-dropdown .is-focused {
+    background-color: #1f2735 !important; /* Fundo ligeiramente mais claro */
+    color: #00d4ff !important;            /* Texto acende em Ciano brilhante! */
+}
+
+.dash-dropdown .Select-clear,
+.dash-dropdown .Select-arrow {
+    color: #9ca3af !important;
+}
