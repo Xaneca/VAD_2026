@@ -413,15 +413,25 @@ layout = html.Div(style={
             'alignItems': 'stretch',
             'padding': '20px'
         }, children=[
-            html.Div("Select Launch Site (Filter)", style={**card_style, 'gridColumn': '3', 'gridRow': '4'}),
-            dcc.Dropdown(
-                    id='site-dropdown',
-                    # Criamos a opção "ALL" e depois juntamos todos os sites únicos do teu df_merged
-                    options=[{'label': 'All Sites', 'value': 'ALL'}] + [{'label': site, 'value': site} for site in df_merged['LAUNCH_SITE'].dropna().unique()],
-                    value='ALL', # Valor pré-selecionado ao abrir a página
-                    clearable=False,
-                    style={'width': '300px', 'color': 'black', 'marginBottom': '20px'} # Cor preta para o texto se ler no fundo branco do dropdown
-            )
+            html.Div("Select Launch Sites (Cumulative)", style={'fontSize': '14px', 'fontWeight': 'bold', 'color': 'white', 'marginBottom': '15px', 'textAlign': 'left'}),
+            
+            html.Div(style={'display': 'flex', 'gap': '10px', 'marginBottom': '15px'}, children=[
+                html.Button("Select All", id="select-all-btn", n_clicks=0,
+                            style={'flex': '1', 'padding': '6px', 'fontSize': '11px', 'backgroundColor': '#2d3748', 'color': '#00d4ff', 'border': '1px solid #4a6fa5', 'borderRadius': '4px', 'cursor': 'pointer', 'fontWeight': 'bold'}),
+                html.Button("Clear All", id="clear-all-btn", n_clicks=0,
+                            style={'flex': '1', 'padding': '6px', 'fontSize': '11px', 'backgroundColor': '#2d3748', 'color': '#ff4b4b', 'border': '1px solid #ff4b4b', 'borderRadius': '4px', 'cursor': 'pointer', 'fontWeight': 'bold'}),
+            ]),
+
+            # Caixa com Scroll para as checkboxes ficarem arrumadas
+            html.Div(style={'overflowY': 'auto', 'maxHeight': '280px', 'textAlign': 'left', 'paddingLeft': '5px', 'minHeight': '400px'}, children=[
+                dcc.Checklist(
+                    id='site-checklist',
+                    options=[{'label': f" {site}", 'value': site} for site in df_merged['LAUNCH_SITE'].dropna().unique()],
+                    value=list(df_merged['LAUNCH_SITE'].dropna().unique()), 
+                    labelStyle={'display': 'block', 'color': 'white', 'marginBottom': '8px', 'cursor': 'pointer', 'fontSize': '13px'},
+                    inputStyle={'marginRight': '8px'}
+                )
+            ])
         ])
     ])
 ])
@@ -433,16 +443,18 @@ layout = html.Div(style={
 @callback(
     Output('line-graph', 'figure'),
     Output('line-chart-title', 'children'),
-    Input('site-dropdown', 'value')
+    Input('site-checklist', 'value') # <-- MUDAR AQUI: de site-dropdown para site-checklist
 )
-def update_line_chart(selected_site):
-    # 1. Filtrar os dados com base na escolha
-    if selected_site == 'ALL':
-        df_filtered = df_merged
-        title = "Launches over the years: All Sites"
-    else:
-        df_filtered = df_merged[df_merged['LAUNCH_SITE'] == selected_site]
-        title = f"Launches over the years: {selected_site}"
+def update_line_chart(selected_sites): # <-- MUDAR AQUI: agora recebe uma lista de sites selecionados
+    # Caso o utilizador retire o visto de todas as checkboxes
+    if not selected_sites:
+        fig = go.Figure()
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis={'visible': False}, yaxis={'visible': False})
+        return fig, "No sites selected"
+
+    # 1. Filtrar os dados com base na escolha cumulativa usando .isin()
+    df_filtered = df_merged[df_merged['LAUNCH_SITE'].isin(selected_sites)]
+    title = f"Launches over the years ({len(selected_sites)} sites combined)"
         
     # 2. Agrupar por ano (usando os dados filtrados)
     df_yearly = df_filtered.groupby('LAUNCH_YEAR').size().reset_index(name='launches')
@@ -452,9 +464,9 @@ def update_line_chart(selected_site):
     fig = go.Figure(go.Scatter(
         x=df_yearly['LAUNCH_YEAR'], 
         y=df_yearly['launches'],
-        mode='lines+markers', # <-- MUDAR AQUI: adicionar '+markers'
+        mode='lines+markers', 
         line=dict(color='#4a6fa5', width=3, shape='spline'), 
-        marker=dict(size=6, color='#e66b8b', line=dict(width=1, color='white')) # <-- ADICIONAR AQUI: o estilo dos pontos
+        marker=dict(size=6, color='#e66b8b', line=dict(width=1, color='white')) 
     ))
     
     # 4. Configurar a escala Logarítmica
@@ -466,11 +478,12 @@ def update_line_chart(selected_site):
             color='white', 
             showgrid=True, gridcolor='#2d3748', 
             title="Number of Launches (Log)", 
-            type='log' # type='log' faz a magia dos 10, 100, 1000
+            type='log' 
         )
     )
     
     return fig, title
+
 @callback(
     Output('mapa-2d', 'figure'),
     Output('last-clicked-site', 'data'), # 👈 Vai guardar a memória aqui
@@ -542,8 +555,29 @@ def highlight_site_on_map(clickData, last_clicked):
         margin=dict(l=0, r=0, t=0, b=0)
     )
     
-    # 🔴 O SEGREDO ESTÁ AQUI: Devolvemos o mapa, a memória nova, e um 'None' para apagar o clique do rato!
     return fig_mapa_nova, novo_selecionado, None
+
+# botao "Select All" e "Clear All" para a checklist de sites
+@callback(
+    Output('site-checklist', 'value'),
+    Input('select-all-btn', 'n_clicks'),
+    Input('clear-all-btn', 'n_clicks'),
+    State('site-checklist', 'options'),
+    prevent_initial_call=True
+)
+def handle_select_all_clear(all_clicks, clear_clicks, options):
+    # 🟢 Usar dash.ctx.triggered_id deteta o clique de forma 100% segura
+    trigger = dash.ctx.triggered_id
+
+    if trigger == 'select-all-btn':
+        # Seleciona todos os valores disponíveis nas opções
+        return [opt['value'] for opt in options]
+
+    elif trigger == 'clear-all-btn':
+        # Limpa todos os vistos (lista vazia)
+        return []
+
+    raise dash.exceptions.PreventUpdate
 
 if __name__ == '__main__':
     args = sys.argv[1:] 

@@ -20,3 +20,35 @@
     border-color: #00d4ff;
     box-shadow: 0 0 10px rgba(0, 212, 255, 0.4); /* (Opcional) Dá um brilho subtil! */
 }
+
+/* ============================================================
+   CUSTOMIZAÇÃO DA SCROLLBAR (Para Chrome, Edge e Safari)
+   ============================================================ */
+
+::-webkit-scrollbar {
+    width: 6px;               /* À esquerda/direita (vertical) */
+    height: 6px;              /* Abaixo (horizontal) */
+}
+
+::-webkit-scrollbar-track {
+    background: #10151f;      /* Cor escura igual ao fundo do teu painel */
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #2d3748;      /* Um cinza azulado discreto para não distrair */
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #00d4ff;      /* Acende em Cyan brilhante quando passas o rato! */
+    cursor: pointer;
+}
+
+/* ============================================================
+   SUPORTE PARA FIREFOX (Norma standard moderna)
+   ============================================================ */
+* {
+    scrollbar-width: thin;          /* Torna a barra mais fininha e elegante */
+    scrollbar-color: #2d3748 #10151f; /* [Cor do manípulo] [Cor da calha] */
+}
