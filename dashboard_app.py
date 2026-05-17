@@ -43,4 +43,4 @@ if __name__ == '__main__':
 
     # realoader falso para nao rodar sempre o dataset_merge cada vez que fazemos uma alteração
     # app.run_server(debug=True, use_reloader=False)
-    app.run_server(debug=True)
+    app.run(debug=True)

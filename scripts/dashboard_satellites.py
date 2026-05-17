@@ -721,6 +721,56 @@ def make_filter_section(group):
         html.Div(id=f'collapse-{gid}', children=[control], style={'padding': '8px 4px 4px 4px', 'display': 'block'})
     ], style={'marginBottom': '4px'})
 
+
+# ============================================================
+# ATMOSPHERIC RE-ENTRIES (CUMULATIVE DATA PROCESS)
+# ============================================================
+df_3d['DECAY_DATE'] = pd.to_datetime(df_3d['DECAY_DATE'], errors='coerce')
+df_3d['LAUNCH_DATE'] = pd.to_datetime(df_3d['LAUNCH_DATE'], errors='coerce')
+
+# Filtrar apenas os que reentraram
+reentered_df = df_3d[df_3d['DECAY_DATE'].notnull()].copy()
+
+# 1. Gráfico da Esquerda: Cumulativo ao longo do tempo
+reentered_df_sorted = reentered_df.sort_values('DECAY_DATE')
+daily_reentries = reentered_df_sorted.groupby('DECAY_DATE').size().reset_index(name='Daily_Count')
+daily_reentries['Cumulative_Reentries'] = daily_reentries['Daily_Count'].cumsum()
+
+fig_reentered = go.Figure(go.Scatter(
+    x=daily_reentries['DECAY_DATE'],
+    y=daily_reentries['Cumulative_Reentries'],
+    mode='lines',
+    line=dict(width=2, color='#ff4b4b'),
+    hovertemplate="<b>Date:</b> %{x}<br><b>Total Re-entered:</b> %{y}<extra></extra>"
+))
+
+fig_reentered.update_layout(
+    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+    margin=dict(l=50, r=20, t=20, b=10),
+    xaxis=dict(color='white', showgrid=False),
+    yaxis=dict(color='white', showgrid=True, gridcolor='#2d3748', title="Total Re-entered Objects")
+)
+
+# 2. Gráfico da Direita: Histograma de tempo em órbita (em anos)
+reentered_df['DAYS_IN_ORBIT'] = (reentered_df['DECAY_DATE'] - reentered_df['LAUNCH_DATE']).dt.days
+reentered_df['YEARS_IN_ORBIT'] = reentered_df['DAYS_IN_ORBIT'] / 365.25
+reentered_df = reentered_df[reentered_df['YEARS_IN_ORBIT'] >= 0] # Remover possíveis erros de dados de datas
+
+fig_lifespan = go.Figure(go.Histogram(
+    x=reentered_df['YEARS_IN_ORBIT'],
+    xbins=dict(start=0, end=25, size=1), # Agrupado de 1 em 1 ano
+    marker_color='#8ea4b8',
+    opacity=0.8,
+    hovertemplate="<b>Lifespan:</b> %{x} years<br><b>Objects:</b> %{y}<extra></extra>"
+))
+
+fig_lifespan.update_layout(
+    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+    margin=dict(l=40, r=20, t=20, b=10),
+    xaxis=dict(color='white', showgrid=False, title="Years Spent in Orbit"),
+    yaxis=dict(color='white', showgrid=True, gridcolor='#2d3748', title="Object Count")
+)
+
 # ============================================================
 # APP INICIALIZAÇÃO
 # ============================================================
@@ -945,6 +995,17 @@ layout = html.Div(style={
         html.Div(style={**card_style, 'gridColumn': '2 / 4', 'gridRow': '4', 'padding': '15px', 'display': 'flex', 'flexDirection': 'column', 'minHeight': '350px '}, children=[
             html.Div('CATALOG ENTRIES / YEAR', style={'color': COLORS['text'], 'fontSize': '13px', 'fontWeight': 'bold', 'marginBottom': '10px'}),
             dcc.Graph(figure=fig_line, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%',  'flex': '1'})
+        ]),
+
+        # Decays
+        html.Div(style={**card_style, 'gridColumn': '1 / 4', 'gridRow': '5', 'minHeight': '400px'}, children=[
+                html.H3("Cumulative Total of Objects that Re-entered the Atmosphere (1957 - Present)", style={'fontWeight': 'normal', 'fontSize': '16px', 'marginBottom': '10px', 'textAlign': 'left', 'width': '100%'}),
+                dcc.Graph(figure=fig_reentered, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
+        ]),
+
+        html.Div(style={**card_style, 'gridColumn': '4', 'gridRow': '5', 'minHeight': '350px'}, children=[
+            html.H3("Orbital Lifespan Distribution before Decay", style={'fontWeight': 'normal', 'fontSize': '15px', 'marginBottom': '10px', 'textAlign': 'left', 'width': '100%'}),
+            dcc.Graph(figure=fig_lifespan, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
     ]),
 
