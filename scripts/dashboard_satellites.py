@@ -1,5 +1,6 @@
 import dash
 from dash import dcc, html, Input, Output, State, dash_table, callback
+from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
@@ -641,36 +642,18 @@ mask_geo = (altitudes > 35786) & (altitudes <= 40000)
 v_style = dict(box_visible=True, line_color='#4a6fa5', fillcolor='#2d4a6f', opacity=0.6)
 
 fig_violin = go.Figure()
-fig_violin.add_trace(go.Violin(y=get_sample(mask_all), visible=True,  name='ALL', **v_style))
-fig_violin.add_trace(go.Violin(y=get_sample(mask_leo), visible=False, name='LEO', **v_style))
-fig_violin.add_trace(go.Violin(y=get_sample(mask_meo), visible=False, name='MEO', **v_style))
-fig_violin.add_trace(go.Violin(y=get_sample(mask_geo), visible=False, name='GEO', **v_style))
 
+# Adicionamos apenas a visualização principal ("ALL"), pois os filtros tratam do resto
+fig_violin.add_trace(go.Violin(y=get_sample(mask_all), visible=True, name='ALL', **v_style))
+
+# Layout limpo, sem a secção updatemenus
 fig_violin.update_layout(
     paper_bgcolor='rgba(0,0,0,0)',
     plot_bgcolor='rgba(0,0,0,0)',
     margin=dict(l=35, r=10, t=35, b=10),
     yaxis=dict(showgrid=True, gridcolor='#2d3748', color='white', title=dict(text='Altitude (km)', font=dict(size=10))),
     xaxis=dict(showticklabels=False),
-    showlegend=False,
-    updatemenus=[
-        dict(
-            type="buttons", direction="right",
-            x=0.5, y=1.15, xanchor='center', yanchor='bottom', showactive=True,
-            buttons=list([
-                dict(label="ALL", method="update",
-                     args=[{"visible": [True, False, False, False]}, {"yaxis.autorange": True}]),
-                dict(label="LEO", method="update",
-                     args=[{"visible": [False, True, False, False]}, {"yaxis.range": [0, 2500]}]),
-                dict(label="MEO", method="update",
-                     args=[{"visible": [False, False, True, False]}, {"yaxis.range": [2000, 36500]}]),
-                dict(label="GEO", method="update",
-                     args=[{"visible": [False, False, False, True]}, {"yaxis.range": [35000, 41000]}]),
-            ]),
-            font=dict(size=9, color="#00d4ff"),
-            bgcolor="#1f2937", bordercolor="#4a6fa5", borderwidth=1
-        )
-    ]
+    showlegend=False
 )
 
 df_3d['EPOCH_YEAR'] = pd.to_datetime(df_3d['EPOCH'], errors='coerce').dt.year
@@ -879,20 +862,56 @@ layout = html.Div(style={
     }, children=[
         # Linha 1
         html.Div(style={**card_style, 'gridColumn': '1 / 3', 'gridRow': '1'}, children=[
-            dcc.Graph(id='pie-type-object', config={'displayModeBar': False}, style={'width': '100%', 'height': '100%'})
+            dcc.Graph(id='pie-type-object', figure=fig_type_object, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%'})
         ]),
         html.Div(style={**card_style, 'gridColumn': '3 / 5', 'gridRow': '1 / 3', 'justifyContent': 'space-between', 'padding': '15px'}, children=[
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center', 'width': '100%', 'marginBottom': '10px'}, children=[
                 html.Div('TOP CONSTELLATIONS', style={'color': COLORS['text'], 'fontSize': '14px', 'fontWeight': 'bold'}),
             ]),
-            dcc.Graph(id='bar-constellations', config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
+            dcc.Graph(id='bar-constellations', figure=fig_bar, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
 
         # Linha 2
-        html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '2'}, children=[
-            html.Div(id='kpi-objects-count', children=f'{len(df_3d):,}', style={'color': '#00d4ff', 'fontSize': '26px', 'fontWeight': 'bold'}),
-            html.Div('OBJECTS', style={'color': COLORS['text'], 'fontSize': '12px', 'letterSpacing': '1px'})
+
+        # Status
+        html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '2', 'padding': '5px 10px'}, children=[
+            html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center', 'width': '100%'}, children=[
+                html.Div([
+                    html.Div(id='kpi-objects-count', children='-', style={'color': '#ffffff', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('TOTAL', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'}),
+                
+                html.Div(style={'width': '1px', 'height': '25px', 'backgroundColor': '#2d3748'}),
+                
+                html.Div([
+                    html.Div(id='kpi-o-count', children='-', style={'color': '#00ff88', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('O (ACTIVE)', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'}),
+                
+                html.Div(style={'width': '1px', 'height': '25px', 'backgroundColor': '#2d3748'}),
+                
+                html.Div([
+                    html.Div(id='kpi-ar-count', children='-', style={'color': '#00d4ff', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('AR (RESERVE)', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'}),
+                
+                html.Div(style={'width': '1px', 'height': '25px', 'backgroundColor': '#2d3748'}),
+                
+                html.Div([
+                    html.Div(id='kpi-r-count', children='-', style={'color': '#ffb800', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('R (NON-OPS)', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'}),
+                
+                html.Div(style={'width': '1px', 'height': '25px', 'backgroundColor': '#2d3748'}),
+                
+                html.Div([
+                    html.Div(id='kpi-d-count', children='-', style={'color': '#ff4b4b', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('D (DECAYED)', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'})
+            ])
         ]),
+
+        # donu graph for percentage of objects selected
         html.Div(style={**card_style, 'gridColumn': '2', 'gridRow': '2'}, children=[
             dcc.Graph(id='kpi-pct-graph', figure=fig_pct, config={'displayModeBar': False}, style={'width': '70px', 'height': '70px'})
         ]),
@@ -948,22 +967,43 @@ layout = html.Div(style={
                              style={'color': '#9ca3af', 'fontSize': '13px', 'fontStyle': 'italic'})
                 ]),
                 html.Button('🔍 Conjunctions', id='check-conjunctions-btn', n_clicks=0,
-                            style={'display': 'none'})
+                            style={'display': 'none', 'color': '#ffffff', 'fontWeight': 'bold'})
             ]),
         ]),
 
         # Filtros
+
         html.Div(style={
             **card_style, 'gridColumn': '4', 'gridRow': '3 / 5',
             'justifyContent': 'flex-start', 'alignItems': 'stretch',
             'padding': '15px', 'overflowY': 'auto'
-        }, children=[
+        }, children=[html.Div(style={'marginBottom': '20px', 'width': '100%'}, children=[
+                html.Div('🔍 SEARCH SATELLITE', style={
+                    'color': '#ffffff', 'fontSize': '12px', 'fontWeight': 'bold', 
+                    'letterSpacing': '1px', 'marginBottom': '8px'
+                }),
+                dcc.Dropdown(
+                    id='satellite-search-bar',
+                    # Criamos uma lista inteligente: mostra "NOME (ID)" mas guarda o INDEX do pandas!
+                    options=[
+                        {
+                            'label': f"🚀 {str(row['NAME'])} ({str(int(row['NORAD_CAT_ID']))})", 
+                            'value': idx
+                        } for idx, row in df_3d.iterrows()
+                    ],
+                    placeholder="Type satellite name or NORAD ID...",
+                    searchable=True,  # 👈 Ativa a pesquisa por texto!
+                    clearable=True,
+                    className='dash-dropdown',
+                    style={'width': '100%', 'color': 'black'}
+                )
+            ]),
             html.Div('FILTERS', style={'color': COLORS['text'], 'fontSize': '15px', 'fontWeight': 'bold', 'marginBottom': '15px', 'borderBottom': '1px solid #4a6fa5', 'paddingBottom': '10px'}),
             *[make_filter_section(g) for g in filter_groups],
-            html.Button('Apply Filters', id='apply-filters', n_clicks=0, style={
-                **button_style, 'marginTop': 'auto', 'width': '100%',
-                'backgroundColor': '#4a6fa5', 'fontWeight': 'bold', 'padding': '12px'
-            })
+            # html.Button('Apply Filters', id='apply-filters', n_clicks=0, style={
+            #     **button_style, 'marginTop': 'auto', 'width': '100%',
+            #     'backgroundColor': '#4a6fa5', 'fontWeight': 'bold', 'padding': '12px'
+            # })
         ]),
 
         # Linha 4
@@ -971,11 +1011,11 @@ layout = html.Div(style={
             html.Div(style={'textAlign': 'center', 'marginBottom': '5px'}, children=[
                 html.Div('ALTITUDE DENSITY', style={'color': COLORS['text'], 'fontSize': '12px', 'fontWeight': 'bold'}),
             ]),
-            dcc.Graph(id='violin-altitude', config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
+            dcc.Graph(id='violin-altitude', figure=fig_violin, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
         html.Div(style={**card_style, 'gridColumn': '2 / 4', 'gridRow': '4', 'padding': '15px', 'display': 'flex', 'flexDirection': 'column', 'minHeight': '350px'}, children=[
             html.Div('CATALOG ENTRIES / YEAR', style={'color': COLORS['text'], 'fontSize': '13px', 'fontWeight': 'bold', 'marginBottom': '10px'}),
-            dcc.Graph(id='line-launches', config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
+            dcc.Graph(id='line-launches', figure=fig_line, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
 
         # Decays
@@ -1162,22 +1202,48 @@ for group in filter_groups:
         return {'display': 'none'}, '▸'
 
 
-# --- Click no globo ---
+# --- Click no globo e Barra de Pesquisa combinados ---
 @callback(
     Output('selected-object-idx', 'data'),
     Output('selected-norad-id',   'data'),
+    Output('satellite-search-bar', 'value'), # 👈 Sincroniza o texto da barra ao clicar no globo
     Input('globe-3d', 'clickData'),
+    Input('satellite-search-bar', 'value'),  # 👈 Ouve a tua nova barra de pesquisa
     prevent_initial_call=True
 )
-def store_click(click_data):
-    if click_data is None: return None, None
-    try:
-        pt = click_data['points'][0]
-        cd = pt.get('customdata')
-        if cd is not None: return int(cd[0]), int(cd[7])
-    except Exception as ex:
-        print(f"store_click error: {ex}")
-    return None, None
+def store_click(click_data, search_value):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
+
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # CÉNARIO 1: O utilizador escreveu e escolheu algo na Barra de Pesquisa
+    if trigger_id == 'satellite-search-bar':
+        if search_value is None:
+            return None, None, None
+        try:
+            # Vê qual é o NORAD_CAT_ID correspondente a esse index no teu df_3d
+            norad_id = int(df_3d.loc[search_value, 'NORAD_CAT_ID'])
+            return search_value, norad_id, search_value
+        except Exception as ex:
+            print(f"Search bar error: {ex}")
+            return None, None, None
+
+    # CENÁRIO 2: O utilizador clicou com o rato diretamente num ponto do Globo 3D
+    if trigger_id == 'globe-3d' and click_data:
+        try:
+            pt = click_data['points'][0]
+            cd = pt.get('customdata')
+            if cd is not None:
+                idx = int(cd[0])
+                norad_id = int(cd[7])
+                # Devolve o Index, o NORAD ID, e preenche a barra com este satélite!
+                return idx, norad_id, idx
+        except Exception as ex:
+            print(f"store_click error: {ex}")
+            
+    return None, None, None
 
 
 # --- Label do slider de tempo ---
@@ -1212,28 +1278,44 @@ def update_time_label(hours):
     Output('bar-constellations', 'figure'),
     Output('violin-altitude', 'figure'),
     Output('line-launches', 'figure'),
+    Output('kpi-o-count', 'children'), 
+    Output('kpi-ar-count', 'children'),
+    Output('kpi-r-count', 'children'), 
+    Output('kpi-d-count', 'children'),
     Input('live-update-interval', 'n_intervals'),
-    Input('apply-filters',        'n_clicks'),
+    # Input('apply-filters',        'n_clicks'),
     Input('selected-object-idx',  'data'),
     Input('close-modal-btn',      'n_clicks'),
     Input('time-travel-slider',   'value'),
-    State('filter-orbit',         'value'),
-    State('filter-constellation', 'value'),
-    State('filter-object_type',   'value'),
-    State('filter-altitude',      'value'),
-    State('filter-inclination',   'value'),
+    Input('filter-orbit',         'value'),         
+    Input('filter-constellation', 'value'),         
+    Input('filter-object_type',   'value'),         
+    Input('filter-altitude',      'value'),        
+    Input('filter-inclination',   'value'),        
     prevent_initial_call=False
 )
-def update_globe(n_intervals, apply_clicks, selected_idx, close_clicks, time_offset_hours,
+def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
                  orbit_vals, const_vals, obj_type_vals, alt_range, inc_range):
     global df_3d
 
-    ctx     = dash.callback_context
-    trigger = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+    ctx = dash.callback_context
+    
+    # 1. Apanhar TODOS os componentes que dispararam o callback (no arranque podem ser vários)
+    triggers = [t['prop_id'].split('.')[0] for t in ctx.triggered] if ctx.triggered else []
+    trigger_principal = triggers[0] if triggers else None
 
-    update_secondary_charts = (trigger == 'apply-filters') or (trigger == 'live-update-interval' and n_intervals == 0) or (trigger is None)
+    # 2. Lógica robusta de deteção:
+    is_initial_load = not triggers or trigger_principal in ['', '.', None]
+    is_first_tick = ('live-update-interval' in triggers and n_intervals == 0)
+    
+    filtros = ['filter-orbit', 'filter-constellation', 'filter-object_type', 'filter-altitude', 'filter-inclination']
+    is_filter_change = any(f in triggers for f in filtros)
 
-    if trigger in ['live-update-interval', 'close-modal-btn']:
+    # 3. Atualiza os gráficos se for o arranque, o 1º tick do relógio, ou se mexerem num filtro
+    update_secondary_charts = is_initial_load or is_first_tick or is_filter_change
+
+    # 4. Atualiza as posições do globo apenas se for o relógio ou ao fechar o modal
+    if trigger_principal in ['live-update-interval', 'close-modal-btn']:
         df_3d = update_live_positions(df_3d)
 
     current_time_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
@@ -1303,6 +1385,7 @@ def update_globe(n_intervals, apply_clicks, selected_idx, close_clicks, time_off
             x=0.5, y=0.5, font_size=12, font_color='white', font_weight='bold', showarrow=False
         )]
     )
+    
 
     # ============================================================
     # RE-GERAR GRÁFICOS SECUNDÁRIOS COM DADOS FILTRADOS (df_f)
@@ -1385,32 +1468,41 @@ def update_globe(n_intervals, apply_clicks, selected_idx, close_clicks, time_off
         fig_viol = dash.no_update
         fig_line = dash.no_update
 
+    # operational status code
+    status_col = 'OPS_STATUS_CODE'
 
-    # O return final mantém-se exatamente igual:
+    if status_col:
+        total_o  = len(df_f[df_f[status_col].isin(['+', 'P', 'X'])])
+        total_ar = len(df_f[df_f[status_col].isin(['B', 'S'])])
+        total_r  = len(df_f[df_f[status_col] == '-'])
+        total_d  = len(df_f[df_f[status_col] == 'D'])
+    else:
+        # Fallback de segurança simplificado caso a coluna exata falhe no ficheiro
+        total_o  = len(df_f[df_f['OBJECT_TYPE'].isin(['Satellite', 'Space Station'])])
+        total_ar = 0
+        total_r  = len(df_f[df_f['OBJECT_TYPE'] == 'Debris'])
+        total_d  = 0
+
+    texto_o_novo        = f"{total_o:,}"
+    texto_ar_novo       = f"{total_ar:,}"
+    texto_r_novo        = f"{total_r:,}"
+    texto_d_novo        = f"{total_d:,}"
+    
     return (
-        fig,
-        info_children,
-        btn_style,
-        fig_pct_nova,
-        f"{total_filtrado:,}",
-        fig_pie,
-        fig_bar,
-        fig_viol,
-        fig_line
+        fig,                    # 1. globe-3d.figure
+        info_children,          # 2. satellite-data-container.children
+        btn_style,              # 3. check-conjunctions-btn.style
+        fig_pct_nova,           # 4. kpi-pct-graph.figure
+        f"{total_filtrado:,}",  # 5. kpi-objects-count.children
+        fig_pie,                # 6. pie-type-object.figure
+        fig_bar,                # 7. bar-constellations.figure
+        fig_viol,               # 8. violin-altitude.figure
+        fig_line,               # 9. line-launches.figure
+        texto_o_novo,           # 10. kpi-o-count.children
+        texto_ar_novo,          # 11. kpi-ar-count.children
+        texto_r_novo,           # 12. kpi-r-count.children
+        texto_d_novo            # 13. kpi-d-count.children
     )
-
-    return (
-        fig,                # globe-3d
-        info_children,      # satellite-data-container
-        btn_style,          # check-conjunctions-btn
-        fig_pct_nova,       # kpi-pct-graph
-        f"{total_filtrado:,}", # kpi-objects-count
-        fig_pie,            # pie-type-object (NOVO)
-        fig_bar,            # bar-constellations (NOVO)
-        fig_viol,           # violin-altitude (NOVO)
-        fig_line            # line-launches (NOVO)
-    )
-
 
 # --- Modal abertura/fecho ---
 @callback(
@@ -1585,7 +1677,6 @@ def back_to_table(n_clicks, modal_style):
     if n_clicks:
         return {**modal_style, 'display': 'flex'}, False
     return dash.no_update, dash.no_update
-
 
 if __name__ == '__main__':
     app.run(debug=True)
