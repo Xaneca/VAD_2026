@@ -196,7 +196,8 @@ fig_country.add_trace(
         y=df_country['total_launches'], 
         name="Total launches (Log)", 
         marker_color='#e66b8b',
-        offsetgroup=1  # <--- ADICIONAR ISTO AQUI
+        offsetgroup=1,
+        hovertemplate="<b>%{x}</b><br>Launches: %{y}<extra></extra>"
     ), 
     secondary_y=False 
 )
@@ -208,7 +209,8 @@ fig_country.add_trace(
         y=df_country['num_sites'], 
         name="Number of Sites (Linear)", 
         marker_color='#8ea4b8', 
-        offsetgroup=2  # <--- E ADICIONAR ISTO AQUI
+        offsetgroup=2,
+        hovertemplate="<b>%{x}</b><br>Num sites: %{y}<extra></extra>"
     ), 
     secondary_y=True 
 )
@@ -397,23 +399,30 @@ layout = html.Div(style={
             
             # Título dinâmico (com ID para podermos alterá-lo)
             html.H3(id='line-chart-title', children="Launches over the years", style={'fontWeight': 'normal', 'fontSize': '16px', 'marginBottom': '10px'}),
-            
-            # O Dropdown para filtrar
-            dcc.Dropdown(
-                id='site-dropdown',
-                # Criamos a opção "ALL" e depois juntamos todos os sites únicos do teu df_merged
-                options=[{'label': 'All Sites', 'value': 'ALL'}] + [{'label': site, 'value': site} for site in df_merged['LAUNCH_SITE'].dropna().unique()],
-                value='ALL', # Valor pré-selecionado ao abrir a página
-                clearable=False,
-                style={'width': '300px', 'color': 'black', 'marginBottom': '20px'} # Cor preta para o texto se ler no fundo branco do dropdown
-            ),
+        
             
             # O espaço vazio para o Gráfico (com ID para o Callback saber para onde o enviar)
             dcc.Graph(id='line-graph', config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
 
-        html.Div("Select Launch Site (Filter)", style={**card_style, 'gridColumn': '3', 'gridRow': '4'}),
-
+        html.Div(style={
+            **card_style, 
+            'gridColumn': '3', 
+            'gridRow': '4', 
+            'justifyContent': 'flex-start', 
+            'alignItems': 'stretch',
+            'padding': '20px'
+        }, children=[
+            html.Div("Select Launch Site (Filter)", style={**card_style, 'gridColumn': '3', 'gridRow': '4'}),
+            dcc.Dropdown(
+                    id='site-dropdown',
+                    # Criamos a opção "ALL" e depois juntamos todos os sites únicos do teu df_merged
+                    options=[{'label': 'All Sites', 'value': 'ALL'}] + [{'label': site, 'value': site} for site in df_merged['LAUNCH_SITE'].dropna().unique()],
+                    value='ALL', # Valor pré-selecionado ao abrir a página
+                    clearable=False,
+                    style={'width': '300px', 'color': 'black', 'marginBottom': '20px'} # Cor preta para o texto se ler no fundo branco do dropdown
+            )
+        ])
     ])
 ])
 
