@@ -459,7 +459,7 @@ def update_line_chart(selected_site):
     return fig, title
 
 if __name__ == '__main__':
-    args = sys.argv[1:]  # Pega os argumentos passados na linha de comando, ignorando o nome do script
+    args = sys.argv[1:] 
     if '--update-data' in args:
         executar_pipeline()
 

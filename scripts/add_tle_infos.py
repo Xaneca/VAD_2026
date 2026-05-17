@@ -61,7 +61,7 @@ def main(path, path_cel, path_jon, new_file_name):
 
 
 if __name__ == "__main__":
-    path = "../DATASETS_SATTELITES/"
+    path = "./DATASETS_SATTELITES/"
     path_cel = os.path.join(path, "celestrack/celestrak_data_api.csv")
     path_jon = ""
     new_file_name = "merged_dataset_tle"

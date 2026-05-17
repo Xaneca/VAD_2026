@@ -21,7 +21,11 @@ dash.register_page(__name__, name='Satellites', path='/')
 # PREPARAR DADOS 3D (Versão SGP4 ECI para ECEF)
 # ============================================================
 def prepare_3d_data(df):
+    print("Valor inicial de objetos:", len(df))
+
     df = df.dropna(subset=['TLE_LINE1', 'TLE_LINE2']).copy()
+    print(f"Após remover os que não têm TLE: {len(df)}")
+
     tempo_atual = datetime.utcnow()
     df['SNAPSHOT_TIME'] = tempo_atual
     jd, fr = jday(tempo_atual.year, tempo_atual.month, tempo_atual.day,
@@ -45,6 +49,7 @@ def prepare_3d_data(df):
     df['X_ECI'] = x_list; df['Y_ECI'] = y_list; df['Z_ECI'] = z_list
     df['VELOCITY'] = vel_list; df['ALTITUDE'] = alt_list
     df = df.dropna(subset=['X_ECI', 'Y_ECI', 'Z_ECI'])
+    print(f"Após remover os que deram erro SGP4 (ex: já caíram): {len(df)}")
 
     def calculate_gmst(date_utc):
         jd_now = pd.Timestamp(date_utc).to_julian_date()
