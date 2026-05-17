@@ -103,7 +103,7 @@ Alternatively, if you want to trigger the data pipeline to fetch the most recent
 python dashboard_app.py --update-data
 ```
 
-Once initialized, open your browser and navigate to: **`http://127.0.0.1:8051/`**
+Once initialized, open your browser and navigate to: **`http://127.0.0.1:8050/`**
 ---
 
 ## 🎨 Visual Customization (Assets)
