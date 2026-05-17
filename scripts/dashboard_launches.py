@@ -1,5 +1,6 @@
 import dash
-from dash import html, dcc, callback, Input, Output
+from dash import html, dcc, callback, Input, State, Output, no_update
+from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import pandas as pd
 import subprocess
@@ -87,7 +88,8 @@ fig_ranking = go.Figure(go.Bar(
     marker_color='#4a6fa5', # A cor da barra
     text=launches,       # Coloca o número escrito na própria barra
     textposition='auto',    # O Plotly decide se o texto fica dentro ou fora da barra
-    textfont=dict(color='white')
+    textfont=dict(color='white'),
+    hovertemplate="<b>%{y}</b><br>Launches: %{x}<extra></extra>"
 ))
 
 # Limpar o fundo para ficar transparente e combinar com o teu design
@@ -96,8 +98,8 @@ fig_ranking.update_layout(
     plot_bgcolor='rgba(0,0,0,0)',
     margin=dict(l=0, r=0, t=40, b=0), # Margens (Left, Right, Top, Bottom)
     xaxis=dict(showgrid=False, showticklabels=False, zeroline=False), # Escondemos os números do eixo X em baixo porque já estão nas barras
-    yaxis=dict(autorange="reversed", showgrid=False, color='white', tickfont=dict(size=12)), # 'reversed' para o maior ficar no topo!
-    title=dict(text="RANKING LIST", font=dict(color='white', size=18))
+    yaxis=dict(autorange="reversed", showgrid=False, color='white', tickfont=dict(size=12), tick0=20), # 'reversed' para o maior ficar no topo!
+    title=dict(text="RANKING LIST", font=dict(color='white', size=18)),
 )
 
 # ============================================================
@@ -133,7 +135,7 @@ launches_last_year = len(df_merged[df_merged['LAUNCH_YEAR'] == prev_year])
 # ============================================================
 # 2D MAP
 # ============================================================
-hover_texts = df_launches['LOCATION_NAME'] + '<br>Lançamentos: ' + df_launches['count'].astype(str)
+hover_texts = df_launches['LOCATION_NAME'] + '<br>Launches: ' + df_launches['count'].astype(str)
 
 fig_map = go.Figure(go.Scattergeo(
     lon = df_launches['LONGITUDE'],
@@ -215,7 +217,7 @@ fig_country.add_trace(
 fig_country.update_layout(
     paper_bgcolor='rgba(0,0,0,0)', 
     plot_bgcolor='rgba(0,0,0,0)',
-    margin=dict(l=0, r=0, t=40, b=0),
+    margin=dict(l=50, r=60, t=40, b=0),
     legend=dict(
         orientation="h",
         yanchor="bottom", y=1.02,
@@ -301,6 +303,7 @@ layout = html.Div(style={
         'width': '100%', 
         'marginBottom': '10px'         # Margem sutil antes de começarem os gráficos
     }, children=[
+        dcc.Store(id='last-clicked-site', data=None),
         html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
             dcc.Link(
                 html.Button("satellites", className="nav-pill-btn"),
@@ -313,7 +316,7 @@ layout = html.Div(style={
         ])
     ]),
 
-    # O NOSSO GRID PRINCIPAL
+    # GRID PRINCIPAL
     html.Div(style={
         'display': 'grid',
         'gridTemplateColumns': '1fr 1fr 1fr', # 3 colunas de larguras iguais
@@ -326,6 +329,7 @@ layout = html.Div(style={
         # 1. RANKING LIST (Linha 1 & 2)
         html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '1 / 3', 'padding': '10px'}, children=[
             dcc.Graph(
+                id='bar-ranking',
                 figure=fig_ranking, 
                 config={'displayModeBar': False}, # Isto esconde aquela barra de ferramentas chata do Plotly
                 style={'width': '100%', 'height': '100%'}
@@ -375,6 +379,7 @@ layout = html.Div(style={
             
             # O Gráfico
             dcc.Graph(
+                id='mapa-2d',
                 figure=fig_map, 
                 config={'displayModeBar': True, 'scrollZoom': True}, 
                 style={'width': '100%', 'height': '100%', 'flex': '1'}
@@ -457,6 +462,79 @@ def update_line_chart(selected_site):
     )
     
     return fig, title
+@callback(
+    Output('mapa-2d', 'figure'),
+    Output('last-clicked-site', 'data'), # 👈 Vai guardar a memória aqui
+    Output('bar-ranking', 'clickData'),
+    Input('bar-ranking', 'clickData'),
+    State('last-clicked-site', 'data')   # 👈 Vai ler a memória daqui
+)
+def highlight_site_on_map(clickData, last_clicked):
+    # 1. Se o clique estiver vazio (porque a página carregou ou nós limpámos), pára tudo!
+    if clickData is None:
+        raise PreventUpdate
+        
+    # 2. Qual foi a barra clicada?
+    site_clicado = clickData['points'][0]['y']
+    
+    # ==========================================
+    # 3. A LÓGICA DO TOGGLE (Desselecionar)
+    # ==========================================
+    if site_clicado == last_clicked:
+        # Clicou na que já estava acesa! Desliga.
+        novo_selecionado = None
+    else:
+        # Clicou numa nova! Liga.
+        novo_selecionado = site_clicado
+        
+    # 4. Construir as cores exatas que pediste
+    cores = []
+    for site in df_launches['LAUNCH_SITE']:
+        if novo_selecionado is None:
+            cores.append('#e66b8b') # NADA SELECIONADO: Rosa suave
+        elif site == novo_selecionado:
+            cores.append('#00d4ff') # CLICADO: Ciano brilhante!
+        else:
+            cores.append('#e66b8b') # OS OUTROS: Ficam rosa suave
+            
+    # 5. Reconstruir o mapa
+    hover_texts = df_launches['LOCATION_NAME'] + '<br>Lançamentos: ' + df_launches['count'].astype(str)
+
+    fig_mapa_nova = go.Figure(go.Scattergeo(
+        lon = df_launches['LONGITUDE'],
+        lat = df_launches['LATITUDE'],
+        text = hover_texts,
+        hoverinfo = 'text',
+        marker = dict(
+            size = df_launches['count'],
+            sizemode = 'area',
+            sizeref = 2. * max(df_launches['count']) / (40.**2), 
+            sizemin = 3,
+            color = cores,          
+            opacity = 0.8,  
+            line_color = 'rgba(255, 255, 255, 0.8)',
+            line_width = 1
+        )
+    ))
+
+    fig_mapa_nova.update_layout(
+        geo=dict(
+            bgcolor='rgba(0,0,0,0)',
+            showland=True, landcolor='#253e50',      
+            showocean=True, oceancolor='#10151f',     
+            showlakes=True, lakecolor='#10151f',      
+            showcountries=True, countrycolor='#2d3748',   
+            projection_type='natural earth',
+            showframe=False,          
+            coastlinecolor='#2d3748'
+        ),
+        paper_bgcolor='rgba(0,0,0,0)', 
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=0, r=0, t=0, b=0)
+    )
+    
+    # 🔴 O SEGREDO ESTÁ AQUI: Devolvemos o mapa, a memória nova, e um 'None' para apagar o clique do rato!
+    return fig_mapa_nova, novo_selecionado, None
 
 if __name__ == '__main__':
     args = sys.argv[1:] 
