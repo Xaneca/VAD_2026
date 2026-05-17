@@ -44,7 +44,7 @@ The ecosystem leverages high-performance scientific and visualization libraries 
 * **[Plotly Graph Objects](https://plotly.com/python/):** High-performance rendering engine for scientific charts, map projections, and the 3D WebGL globe.
 * **[Pandas](https://pandas.pydata.org/):** Data manipulation, cleaning, database merging (ETL), and complex statistical aggregations.
 * **[NumPy](https://numpy.org/):** Fast matrix calculations for coordinate mapping and orbital altitude algorithms.
-* **[Conda](https://docs.conda.io/):** Isolated virtual environment management and strict dependency control.
+* **[SGP4](https://pypi.org/project/sgp4/):** High-precision orbital propagation library used to calculate real-time satellite position and velocity vectors from TLE (Two-Line Element) data.
 
 ---
 
@@ -93,12 +93,17 @@ pip install -r requirements.txt
 ```
 
 ### 4. Run the Dashboard
-To start the local development server:
+To start the local development server using the existing cached data:
 ```bash
 python dashboard_app.py
 ```
-Once initialized, open your browser and navigate to: **`http://127.0.0.1:8051/`**
 
+Alternatively, if you want to trigger the data pipeline to fetch the most recent orbit telemetry (TLE data) and fetch brand-new launches for the most up-to-date accuracy, run the server with the update flag:
+```bash
+python dashboard_app.py --update-data
+```
+
+Once initialized, open your browser and navigate to: **`http://127.0.0.1:8051/`**
 ---
 
 ## 🎨 Visual Customization (Assets)
