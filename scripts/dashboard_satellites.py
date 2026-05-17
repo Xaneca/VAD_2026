@@ -261,19 +261,23 @@ def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_m
 # ============================================================
 # ÓRBITA COMPLETA (SGP4)
 # ============================================================
-def compute_orbit_line(row, n_points=300):
+def compute_orbit_line(row, target_time, n_points=300):
     sat = Satrec.twoline2rv(row['TLE_LINE1'], row['TLE_LINE2'])
     period_minutes = float(row['PERIOD'])
-    tempo_atual = pd.to_datetime(row['SNAPSHOT_TIME'])
     X, Y, Z = [], [], []
+    
+    # Para garantir alinhamento perfeito, começamos a linha meia órbita ANTES do momento alvo
+    start_time = target_time - timedelta(minutes=period_minutes / 2)
+    
     for i in range(n_points):
         delta_minutes = (period_minutes / n_points) * i
-        t_point = tempo_atual + timedelta(minutes=delta_minutes)
+        t_point = start_time + timedelta(minutes=delta_minutes)
         jd, fr = jday(t_point.year, t_point.month, t_point.day,
                       t_point.hour, t_point.minute, t_point.second + t_point.microsecond / 1e6)
         e, r, v = sat.sgp4(jd, fr)
         if e == 0:
             X.append(r[0]); Y.append(r[1]); Z.append(r[2])
+            
     if len(X) > 0:
         X.append(X[0]); Y.append(Y[0]); Z.append(Z[0])
     return X, Y, Z
@@ -427,8 +431,13 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
 
     if orbit_row is not None:
         try:
-            ox, oy, oz = compute_orbit_line(orbit_row)
-            ox_ecef, oy_ecef, oz_ecef = _eci_orbit_to_ecef(ox, oy, oz, datetime.utcnow())
+            # Identifica qual é o tempo que o globo está a observar (live ou com offset do slider)
+            dt_base = target_time if target_time is not None else datetime.utcnow()
+            
+            # Passa esse dt_base para o cálculo da linha e da conversão
+            ox, oy, oz = compute_orbit_line(orbit_row, dt_base)
+            ox_ecef, oy_ecef, oz_ecef = _eci_orbit_to_ecef(ox, oy, oz, dt_base)
+            
             fig.add_trace(go.Scatter3d(
                 x=ox_ecef, y=oy_ecef, z=oz_ecef, mode='lines',
                 line=dict(color='white', width=2),
@@ -519,8 +528,10 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
             hoverinfo='skip', showlegend=False
         ))
 
+    # ── Para a Órbita Primária ──
     try:
-        ox, oy, oz = compute_orbit_line(primary_row)
+        # Adicionar conj_dt como segundo argumento
+        ox, oy, oz = compute_orbit_line(primary_row, conj_dt) 
         ox_e, oy_e, oz_e = _eci_orbit_to_ecef(ox, oy, oz, conj_dt)
         fig.add_trace(go.Scatter3d(
             x=ox_e, y=oy_e, z=oz_e, mode='lines',
@@ -531,8 +542,10 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
     except Exception as ex:
         print(f"Erro órbita primária: {ex}")
 
+    # ── Para a Órbita Secundária ──
     try:
-        ox2, oy2, oz2 = compute_orbit_line(secondary_row)
+        # Adicionar conj_dt como segundo argumento
+        ox2, oy2, oz2 = compute_orbit_line(secondary_row, conj_dt)
         ox2_e, oy2_e, oz2_e = _eci_orbit_to_ecef(ox2, oy2, oz2, conj_dt)
         fig.add_trace(go.Scatter3d(
             x=ox2_e, y=oy2_e, z=oz2_e, mode='lines',
@@ -945,7 +958,7 @@ layout = html.Div(style={
             'justifyContent': 'flex-start', 'alignItems': 'stretch',
             'padding': '15px', 'overflowY': 'auto'
         }, children=[
-            html.Div('▼ FILTERS', style={'color': COLORS['text'], 'fontSize': '15px', 'fontWeight': 'bold', 'marginBottom': '15px', 'borderBottom': '1px solid #4a6fa5', 'paddingBottom': '10px'}),
+            html.Div('FILTERS', style={'color': COLORS['text'], 'fontSize': '15px', 'fontWeight': 'bold', 'marginBottom': '15px', 'borderBottom': '1px solid #4a6fa5', 'paddingBottom': '10px'}),
             *[make_filter_section(g) for g in filter_groups],
             html.Button('Apply Filters', id='apply-filters', n_clicks=0, style={
                 **button_style, 'marginTop': 'auto', 'width': '100%',
