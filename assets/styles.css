@@ -90,3 +90,49 @@
 .dash-dropdown .Select-arrow {
     color: #9ca3af !important;
 }
+
+/* ============================================================
+   SEGMENTED TOGGLE (Transformar Rádios Feios em Pílulas Sleek)
+   ============================================================ */
+
+/* O contentor principal que junta os dois botões */
+.cyber-toggle {
+    display: flex !important;
+    background-color: #10151f;   /* Fundo escuro igual ao do teu painel */
+    border: 1px solid #2d3748;   /* Borda discreta */
+    border-radius: 20px;         /* Cantos arredondados estilo pílula */
+    padding: 2px;
+}
+
+/* Esconde completamente as bolinhas nativas do rádio */
+.cyber-toggle input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* Estilo base de cada botão de texto */
+.cyber-toggle label {
+    padding: 5px 15px !important;
+    font-size: 11px !important;
+    font-weight: bold !important;
+    color: #9ca3af;              /* Cor cinza apagada quando não ativo */
+    cursor: pointer;
+    border-radius: 15px;         /* Arredonda individualmente cada lado */
+    transition: all 0.25s ease-in-out;
+    margin: 0 !important;        /* Remove margens chatas do Dash */
+    display: inline-block;
+}
+
+/* Quando o rádio lá dentro está marcado, acende o botão! */
+.cyber-toggle label:has(input:checked) {
+    background-color: #4a6fa5 !important; /* O teu azul padrão do tema */
+    color: #ffffff !important;            /* Texto passa a branco puro */
+    box-shadow: 0 0 10px rgba(74, 111, 165, 0.4); /* Efeito neon suave */
+}
+
+/* Efeito visual ao passar o rato por cima dos botões apagados */
+.cyber-toggle label:hover:not(:has(input:checked)) {
+    color: #00d4ff !important;            /* Acende em ciano antes de clicares */
+}
