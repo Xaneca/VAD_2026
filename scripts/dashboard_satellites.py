@@ -421,8 +421,11 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
     )
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        # scene=dict(xaxis=invis, yaxis=invis, zaxis=invis, bgcolor='rgba(0,0,0,0)',
+        #            aspectmode='manual', aspectratio=dict(x=1, y=1, z=1)),
         scene=dict(xaxis=invis, yaxis=invis, zaxis=invis, bgcolor='rgba(0,0,0,0)',
-                   aspectmode='manual', aspectratio=dict(x=1, y=1, z=1)),
+                   aspectmode='manual', aspectratio=dict(x=1, y=1, z=1),
+                   uirevision='manter_camara_globo'), # para o globo nao se mexer quando atualiza posiçao
         legend=dict(x=0.01, y=0.99, font=dict(color='white', size=10),
                     bgcolor='rgba(0,0,0,0.5)', bordercolor='#2d3748', itemsizing='constant'),
         margin=dict(l=0, r=0, t=0, b=0), uirevision='constant', hoverdistance=50,
@@ -526,8 +529,11 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
     )
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        # scene=dict(xaxis=invis, yaxis=invis, zaxis=invis, bgcolor='rgba(0,0,0,0)',
+        #            aspectmode='manual', aspectratio=dict(x=1, y=1, z=1)),
         scene=dict(xaxis=invis, yaxis=invis, zaxis=invis, bgcolor='rgba(0,0,0,0)',
-                   aspectmode='manual', aspectratio=dict(x=1, y=1, z=1)),
+                   aspectmode='manual', aspectratio=dict(x=1, y=1, z=1),
+                   uirevision='manter_camara_conjuncao'),   # para o globo nao se mexer quando atualiza posiçao
         legend=dict(x=0.01, y=0.99, font=dict(color='white', size=10),
                     bgcolor='rgba(0,0,0,0.5)', bordercolor='#2d3748', itemsizing='constant'),
         margin=dict(l=0, r=0, t=0, b=0), uirevision='conj-view', hoverdistance=50,
@@ -813,7 +819,7 @@ layout = html.Div(style={
         html.Div(style={**card_style, 'gridColumn': '1 / 3', 'gridRow': '1'}, children=[
             dcc.Graph(figure=fig_type_object, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%'})
         ]),
-        html.Div(style={**card_style, 'gridColumn': '3 / 5', 'gridRow': '1', 'justifyContent': 'space-between', 'padding': '15px'}, children=[
+        html.Div(style={**card_style, 'gridColumn': '3 / 5', 'gridRow': '1 / 3', 'justifyContent': 'space-between', 'padding': '15px'}, children=[
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center', 'width': '100%', 'marginBottom': '10px'}, children=[
                 html.Div('TOP CONSTELLATIONS', style={'color': COLORS['text'], 'fontSize': '14px', 'fontWeight': 'bold'}),
             ]),
@@ -822,11 +828,11 @@ layout = html.Div(style={
 
         # Linha 2
         html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '2'}, children=[
-            html.Div(f'{len(df_3d):,}', style={'color': '#00d4ff', 'fontSize': '26px', 'fontWeight': 'bold'}),
+            html.Div(id='kpi-objects-count', children=f'{len(df_3d):,}', style={'color': '#00d4ff', 'fontSize': '26px', 'fontWeight': 'bold'}),
             html.Div('OBJECTS', style={'color': COLORS['text'], 'fontSize': '12px', 'letterSpacing': '1px'})
         ]),
         html.Div(style={**card_style, 'gridColumn': '2', 'gridRow': '2'}, children=[
-            dcc.Graph(figure=fig_pct, config={'displayModeBar': False}, style={'width': '70px', 'height': '70px'})
+            dcc.Graph(id='kpi-pct-graph', figure=fig_pct, config={'displayModeBar': False}, style={'width': '70px', 'height': '70px'})
         ]),
 
         # Linha 3 - Globo
@@ -848,8 +854,8 @@ layout = html.Div(style={
                 'border': '1px solid #2d3748', 'zIndex': '10', 'width': '260px',
             }, children=[
                 html.Div(style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'marginBottom': '6px'}, children=[
-                    html.Span('⏱ Viagem no Tempo', style={'color': '#ffd700', 'fontSize': '11px', 'fontWeight': 'bold', 'letterSpacing': '0.5px'}),
-                    html.Span(id='time-travel-label', children='+0h (Agora)',
+                    html.Span('⏱ Time travel', style={'color': '#ffd700', 'fontSize': '11px', 'fontWeight': 'bold', 'letterSpacing': '0.5px'}),
+                    html.Span(id='time-travel-label', children='+0h (Now)',
                               style={'color': '#ffd700', 'fontSize': '11px', 'fontFamily': 'monospace'}),
                 ]),
                 dcc.Slider(
@@ -859,7 +865,7 @@ layout = html.Div(style={
                         -72: {'label': '-3d', 'style': {'color': '#6b7280', 'fontSize': '10px'}},
                         -48: {'label': '-2d', 'style': {'color': '#6b7280', 'fontSize': '10px'}},
                         -24: {'label': '-1d', 'style': {'color': '#6b7280', 'fontSize': '10px'}},
-                          0: {'label': 'Agora', 'style': {'color': '#ffd700', 'fontSize': '10px'}},
+                          0: {'label': 'Now', 'style': {'color': '#ffd700', 'fontSize': '10px'}},
                          24: {'label': '+1d', 'style': {'color': '#6b7280', 'fontSize': '10px'}},
                          48: {'label': '+2d', 'style': {'color': '#6b7280', 'fontSize': '10px'}},
                          72: {'label': '+3d', 'style': {'color': '#6b7280', 'fontSize': '10px'}},
@@ -917,7 +923,7 @@ layout = html.Div(style={
 
         # Filtros
         html.Div(style={
-            **card_style, 'gridColumn': '4', 'gridRow': '2 / 5',
+            **card_style, 'gridColumn': '4', 'gridRow': '3 / 5',
             'justifyContent': 'flex-start', 'alignItems': 'stretch',
             'padding': '15px', 'overflowY': 'auto'
         }, children=[
@@ -932,8 +938,7 @@ layout = html.Div(style={
         # Linha 4
         html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '4', 'padding': '15px', 'display': 'flex', 'flexDirection': 'column', 'minHeight': '350px'}, children=[
             html.Div(style={'textAlign': 'center', 'marginBottom': '5px'}, children=[
-                html.Div('ALTITUDE', style={'color': COLORS['text'], 'fontSize': '12px', 'fontWeight': 'bold'}),
-                html.Div('DENSITY',  style={'color': COLORS['text'], 'fontSize': '12px', 'fontWeight': 'bold'}),
+                html.Div('ALTITUDE DENSITY', style={'color': COLORS['text'], 'fontSize': '12px', 'fontWeight': 'bold'}),
             ]),
             dcc.Graph(figure=fig_violin, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
@@ -1089,7 +1094,7 @@ def store_click(click_data):
 )
 def update_time_label(hours):
     if hours == 0:
-        return '+0h (Agora)'
+        return '+0h (Now)'
     sign = '+' if hours > 0 else ''
     days = abs(hours) // 24
     rem  = abs(hours) % 24
@@ -1108,6 +1113,8 @@ def update_time_label(hours):
     Output('globe-3d', 'figure'),
     Output('satellite-data-container', 'children'),
     Output('check-conjunctions-btn', 'style'),
+    Output('kpi-pct-graph', 'figure'), 
+    Output('kpi-objects-count', 'children'),
     Input('live-update-interval', 'n_intervals'),
     Input('apply-filters',        'n_clicks'),
     Input('selected-object-idx',  'data'),
@@ -1180,7 +1187,31 @@ def update_globe(n_intervals, apply_clicks, selected_idx, close_clicks, time_off
     fig = build_globe_figure(df_f, orbit_row=orbit_row,
                              current_time_str=current_time_str,
                              time_offset_hours=time_offset)
-    return fig, info_children, btn_style
+    
+    # DONUT GRAPH COM PERCENTAGEM DE OBJETOS E NUMERO DE OBJETOS
+    total_global = len(df_3d)
+    total_filtrado = len(df_f)
+    percentagem = (total_filtrado / total_global) * 100 if total_global > 0 else 0
+
+    fig_pct_nova = go.Figure(data=[go.Pie(
+        values=[total_filtrado, total_global - total_filtrado],
+        hole=0.7, 
+        marker_colors=['#00d4ff', '#2d3748'], # Azul claro para os selecionados, fundo cinza para o resto
+        textinfo='none', # Limpa o texto fora do gráfico
+        hoverinfo='skip'
+    )])
+    
+    fig_pct_nova.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', showlegend=False, margin=dict(l=0,r=0,t=0,b=0),
+        annotations=[dict(
+            text=f"{percentagem:.1f}%", # 👈 É aqui que a percentagem vai para o meio do círculo!
+            x=0.5, y=0.5, font_size=12, font_color='white', font_weight='bold', showarrow=False
+        )]
+    )
+    
+    texto_total_novo = f"{total_filtrado:,}"
+
+    return fig, info_children, btn_style, fig_pct_nova, texto_total_novo
 
 
 # --- Modal abertura/fecho ---
