@@ -877,10 +877,46 @@ layout = html.Div(style={
         ]),
 
         # Linha 2
-        html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '2'}, children=[
-            html.Div(id='kpi-objects-count', children=f'{len(df_3d):,}', style={'color': '#00d4ff', 'fontSize': '26px', 'fontWeight': 'bold'}),
-            html.Div('OBJECTS', style={'color': COLORS['text'], 'fontSize': '12px', 'letterSpacing': '1px'})
+
+        # Status
+        html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '2', 'padding': '5px 10px'}, children=[
+            html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center', 'width': '100%'}, children=[
+                html.Div([
+                    html.Div(id='kpi-objects-count', children='-', style={'color': '#ffffff', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('TOTAL', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'}),
+                
+                html.Div(style={'width': '1px', 'height': '25px', 'backgroundColor': '#2d3748'}),
+                
+                html.Div([
+                    html.Div(id='kpi-o-count', children='-', style={'color': '#00ff88', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('O (ACTIVE)', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'}),
+                
+                html.Div(style={'width': '1px', 'height': '25px', 'backgroundColor': '#2d3748'}),
+                
+                html.Div([
+                    html.Div(id='kpi-ar-count', children='-', style={'color': '#00d4ff', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('AR (RESERVE)', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'}),
+                
+                html.Div(style={'width': '1px', 'height': '25px', 'backgroundColor': '#2d3748'}),
+                
+                html.Div([
+                    html.Div(id='kpi-r-count', children='-', style={'color': '#ffb800', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('R (NON-OPS)', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'}),
+                
+                html.Div(style={'width': '1px', 'height': '25px', 'backgroundColor': '#2d3748'}),
+                
+                html.Div([
+                    html.Div(id='kpi-d-count', children='-', style={'color': '#ff4b4b', 'fontSize': '16px', 'fontWeight': 'bold'}),
+                    html.Div('D (DECAYED)', style={'color': '#9ca3af', 'fontSize': '9px', 'letterSpacing': '0.5px'})
+                ], style={'textAlign': 'center', 'flex': '1'})
+            ])
         ]),
+
+        # donu graph for percentage of objects selected
         html.Div(style={**card_style, 'gridColumn': '2', 'gridRow': '2'}, children=[
             dcc.Graph(id='kpi-pct-graph', figure=fig_pct, config={'displayModeBar': False}, style={'width': '70px', 'height': '70px'})
         ]),
@@ -979,10 +1015,10 @@ layout = html.Div(style={
         }, children=[
             html.Div('▼ FILTERS', style={'color': COLORS['text'], 'fontSize': '15px', 'fontWeight': 'bold', 'marginBottom': '15px', 'borderBottom': '1px solid #4a6fa5', 'paddingBottom': '10px'}),
             *[make_filter_section(g) for g in filter_groups],
-            html.Button('Apply Filters', id='apply-filters', n_clicks=0, style={
-                **button_style, 'marginTop': 'auto', 'width': '100%',
-                'backgroundColor': '#4a6fa5', 'fontWeight': 'bold', 'padding': '12px'
-            })
+            # html.Button('Apply Filters', id='apply-filters', n_clicks=0, style={
+            #     **button_style, 'marginTop': 'auto', 'width': '100%',
+            #     'backgroundColor': '#4a6fa5', 'fontWeight': 'bold', 'padding': '12px'
+            # })
         ]),
 
         # Linha 4
@@ -1176,8 +1212,12 @@ def update_time_label(hours):
     Output('check-conjunctions-btn', 'style'),
     Output('kpi-pct-graph', 'figure'), 
     Output('kpi-objects-count', 'children'),
+    Output('kpi-o-count', 'children'), 
+    Output('kpi-ar-count', 'children'),
+    Output('kpi-r-count', 'children'), 
+    Output('kpi-d-count', 'children'),
     Input('live-update-interval', 'n_intervals'),
-    Input('apply-filters',        'n_clicks'),
+    # Input('apply-filters',        'n_clicks'),
     Input('selected-object-idx',  'data'),
     Input('close-modal-btn',      'n_clicks'),
     Input('time-travel-slider',   'value'),       # *** NOVO ***
@@ -1188,7 +1228,7 @@ def update_time_label(hours):
     State('filter-inclination',   'value'),
     prevent_initial_call=False
 )
-def update_globe(n_intervals, apply_clicks, selected_idx, close_clicks, time_offset_hours,
+def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
                  orbit_vals, const_vals, obj_type_vals, alt_range, inc_range):
     global df_3d
 
@@ -1270,10 +1310,28 @@ def update_globe(n_intervals, apply_clicks, selected_idx, close_clicks, time_off
         )]
     )
     
-    texto_total_novo = f"{total_filtrado:,}"
+    status_col = 'OPS_STATUS_CODE'
 
-    return fig, info_children, btn_style, fig_pct_nova, texto_total_novo
+    if status_col:
+        total_o  = len(df_f[df_f[status_col].isin(['+', 'P', 'X'])])
+        total_ar = len(df_f[df_f[status_col].isin(['B', 'S'])])
+        total_r  = len(df_f[df_f[status_col] == '-'])
+        total_d  = len(df_f[df_f[status_col] == 'D'])
+    else:
+        # Fallback de segurança simplificado caso a coluna exata falhe no ficheiro
+        total_o  = len(df_f[df_f['OBJECT_TYPE'].isin(['Satellite', 'Space Station'])])
+        total_ar = 0
+        total_r  = len(df_f[df_f['OBJECT_TYPE'] == 'Debris'])
+        total_d  = 0
 
+    texto_total_novo    = f"{total_filtrado:,}"
+    texto_o_novo        = f"{total_o:,}"
+    texto_ar_novo       = f"{total_ar:,}"
+    texto_r_novo        = f"{total_r:,}"
+    texto_d_novo        = f"{total_d:,}"
+    
+    return (fig, info_children, btn_style, fig_pct_nova, 
+            texto_total_novo, texto_o_novo, texto_ar_novo, texto_r_novo, texto_d_novo)
 
 # --- Modal abertura/fecho ---
 @callback(
