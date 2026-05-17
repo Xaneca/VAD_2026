@@ -303,11 +303,11 @@ layout = html.Div(style={
     }, children=[
         html.Div(style={'display': 'flex', 'gap': '10px'}, children=[
             dcc.Link(
-                html.Button("satellites", style=button_style),
+                html.Button("satellites", className="nav-pill-btn"),
                 href="/"
             ),
             dcc.Link(
-                html.Button("launch", style=button_style), 
+                html.Button("launch", className="nav-pill-btn"), 
                 href="/launches"
             )
         ])
