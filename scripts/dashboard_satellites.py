@@ -567,15 +567,81 @@ fig_bar.update_layout(
     yaxis=dict(showgrid=True, gridcolor='#2d3748', color='white', tickfont=dict(size=10))
 )
 
+# 1. Calcular a altitude de todos
 altitudes = np.sqrt(df_3d['X']**2 + df_3d['Y']**2 + df_3d['Z']**2) - 6371
-fig_violin = go.Figure(data=[go.Violin(
-    y=altitudes[altitudes < 40000].sample(min(5000, len(altitudes))),
-    box_visible=True, line_color='#4a6fa5', fillcolor='#2d4a6f', opacity=0.6
-)])
+
+# Função auxiliar para amostrar no máximo 5000 pontos (evita lag no browser)
+def get_sample(mask):
+    data = altitudes[mask]
+    return data.sample(min(5000, len(data))) if len(data) > 0 else data
+
+# Máscaras de filtro para cada tipo de órbita (limitando a 40.000km)
+mask_all = (altitudes < 40000)
+mask_leo = (altitudes <= 2000)
+mask_meo = (altitudes > 2000) & (altitudes <= 35786)
+mask_geo = (altitudes > 35786) & (altitudes <= 40000)
+
+# Estilo base do teu violino
+v_style = dict(box_visible=True, line_color='#4a6fa5', fillcolor='#2d4a6f', opacity=0.6)
+
+fig_violin = go.Figure()
+
+# 2. Adicionar 4 "camadas" ao gráfico. Apenas a primeira ('ALL') começa ligada (visible=True)
+fig_violin.add_trace(go.Violin(y=get_sample(mask_all), visible=True, name='ALL', **v_style))
+fig_violin.add_trace(go.Violin(y=get_sample(mask_leo), visible=False, name='LEO', **v_style))
+fig_violin.add_trace(go.Violin(y=get_sample(mask_meo), visible=False, name='MEO', **v_style))
+fig_violin.add_trace(go.Violin(y=get_sample(mask_geo), visible=False, name='GEO', **v_style))
+
+# 3. Configurar Layout com os Botões Nativos
 fig_violin.update_layout(
-    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=35,r=10,t=10,b=10),
+    paper_bgcolor='rgba(0,0,0,0)', 
+    plot_bgcolor='rgba(0,0,0,0)', 
+    margin=dict(l=35, r=10, t=35, b=10), # 't' aumentado para dar espaço aos botões
     yaxis=dict(showgrid=True, gridcolor='#2d3748', color='white', title=dict(text='Altitude (km)', font=dict(size=10))),
-    xaxis=dict(showticklabels=False)
+    xaxis=dict(showticklabels=False),
+    showlegend=False,
+    
+    # OS 4 BOTÕES INTERATIVOS
+    updatemenus=[
+        dict(
+            type="buttons",
+            direction="right",     
+            x=0.5, y=1.15,         
+            xanchor='center',
+            yanchor='bottom',
+            showactive=True,
+            buttons=list([
+                dict(
+                    label="ALL", 
+                    method="update", 
+                    args=[{"visible": [True,  False, False, False]}, 
+                          {"yaxis.autorange": True}] # O Plotly calcula sozinho
+                ),
+                dict(
+                    label="LEO", 
+                    method="update", 
+                    args=[{"visible": [False, True,  False, False]}, 
+                          {"yaxis.range": [0, 2500]}] # Focamos a câmara entre 0 e 2500 km
+                ),
+                dict(
+                    label="MEO", 
+                    method="update", 
+                    args=[{"visible": [False, False, True,  False]}, 
+                          {"yaxis.range": [2000, 36500]}] # Focamos na zona média
+                ),
+                dict(
+                    label="GEO", 
+                    method="update", 
+                    args=[{"visible": [False, False, False, True]}, 
+                          {"yaxis.range": [35000, 41000]}] # Focamos lá no alto
+                ),
+            ]),
+            font=dict(size=9, color="#00d4ff"),
+            bgcolor="#1f2937",
+            bordercolor="#4a6fa5",
+            borderwidth=1
+        )
+    ]
 )
 
 df_3d['EPOCH_YEAR'] = pd.to_datetime(df_3d['EPOCH'], errors='coerce').dt.year
@@ -740,7 +806,7 @@ layout = html.Div(style={
     html.Div(style={
         'display': 'grid',
         'gridTemplateColumns': '1fr 1fr 1.5fr 280px',
-        'gridTemplateRows': '220px 80px 650px 200px',
+        'gridTemplateRows': '220px 80px 650px 450px',
         'gap': '15px', 'width': '100%',
     }, children=[
         # Linha 1
@@ -810,7 +876,7 @@ layout = html.Div(style={
                 'zIndex': '10', 'minWidth': '250px', 'display': 'flex', 'flexDirection': 'column'
             }, children=[
                 html.Div(id='satellite-data-container', children=[
-                    html.Div('Clica num objecto no globo para ver a sua órbita',
+                    html.Div('Click on an object on the globe to see its orbit',
                              style={'color': '#9ca3af', 'fontSize': '13px', 'fontStyle': 'italic'})
                 ]),
                 html.Button('🔍 Conjunctions', id='check-conjunctions-btn', n_clicks=0,
@@ -864,16 +930,16 @@ layout = html.Div(style={
         ]),
 
         # Linha 4
-        html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '4', 'padding': '15px'}, children=[
+        html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '4', 'padding': '15px', 'display': 'flex', 'flexDirection': 'column', 'minHeight': '350px'}, children=[
             html.Div(style={'textAlign': 'center', 'marginBottom': '5px'}, children=[
                 html.Div('ALTITUDE', style={'color': COLORS['text'], 'fontSize': '12px', 'fontWeight': 'bold'}),
                 html.Div('DENSITY',  style={'color': COLORS['text'], 'fontSize': '12px', 'fontWeight': 'bold'}),
             ]),
             dcc.Graph(figure=fig_violin, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
-        html.Div(style={**card_style, 'gridColumn': '2 / 4', 'gridRow': '4', 'padding': '15px'}, children=[
+        html.Div(style={**card_style, 'gridColumn': '2 / 4', 'gridRow': '4', 'padding': '15px', 'display': 'flex', 'flexDirection': 'column', 'minHeight': '350px '}, children=[
             html.Div('CATALOG ENTRIES / YEAR', style={'color': COLORS['text'], 'fontSize': '13px', 'fontWeight': 'bold', 'marginBottom': '10px'}),
-            dcc.Graph(figure=fig_line, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
+            dcc.Graph(figure=fig_line, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%',  'flex': '1'})
         ]),
     ]),
 
@@ -901,7 +967,7 @@ layout = html.Div(style={
                 'fontSize': '18px', 'fontWeight': 'bold', 'letterSpacing': '0.5px'
             }),
             # Subtítulo de instrução
-            html.Div('💡 Clica numa linha para visualizar as duas órbitas no globo', style={
+            html.Div('💡 Click on a row to visualize the two orbits on the globe', style={
                 'color': '#6b7280', 'fontSize': '11px', 'marginBottom': '14px',
                 'fontStyle': 'italic'
             }),
@@ -1076,7 +1142,7 @@ def update_globe(n_intervals, apply_clicks, selected_idx, close_clicks, time_off
 
     orbit_row    = None
     btn_style    = {'display': 'none'}
-    info_children = [html.Div('Clica num objecto no globo para ver a sua órbita',
+    info_children = [html.Div('Click on an object on the globe to see its orbit',
                                style={'color': '#9ca3af', 'fontSize': '13px', 'fontStyle': 'italic'})]
 
     if selected_idx is not None and selected_idx in df_3d.index:

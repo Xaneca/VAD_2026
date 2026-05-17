@@ -37,8 +37,9 @@ if __name__ == '__main__':
     }
 
     app.layout = html.Div(style={'backgroundColor': '#040b1a', 'minHeight': '100vh', 'color': 'white'}, children=[
-        # O contentor onde o Dash vai injetar os teus dois dashboards
+        # O contentor onde o Dash vai injetar os dois dashboards
         dash.page_container
     ])
 
-    app.run_server(debug=True)
+    # realoader falso para nao rodar sempre o dataset_merge cada vez que fazemos uma alteração
+    app.run_server(debug=True, use_reloader=False)
