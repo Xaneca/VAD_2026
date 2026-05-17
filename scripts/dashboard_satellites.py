@@ -1,5 +1,6 @@
 import dash
 from dash import dcc, html, Input, Output, State, dash_table, callback
+from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
@@ -989,11 +990,32 @@ layout = html.Div(style={
         ]),
 
         # Filtros
+
         html.Div(style={
             **card_style, 'gridColumn': '4', 'gridRow': '3 / 5',
             'justifyContent': 'flex-start', 'alignItems': 'stretch',
             'padding': '15px', 'overflowY': 'auto'
-        }, children=[
+        }, children=[html.Div(style={'marginBottom': '20px', 'width': '100%'}, children=[
+                html.Div('🔍 SEARCH SATELLITE', style={
+                    'color': '#ffffff', 'fontSize': '12px', 'fontWeight': 'bold', 
+                    'letterSpacing': '1px', 'marginBottom': '8px'
+                }),
+                dcc.Dropdown(
+                    id='satellite-search-bar',
+                    # Criamos uma lista inteligente: mostra "NOME (ID)" mas guarda o INDEX do pandas!
+                    options=[
+                        {
+                            'label': f"🚀 {str(row['NAME'])} ({str(int(row['NORAD_CAT_ID']))})", 
+                            'value': idx
+                        } for idx, row in df_3d.iterrows()
+                    ],
+                    placeholder="Type satellite name or NORAD ID...",
+                    searchable=True,  # 👈 Ativa a pesquisa por texto!
+                    clearable=True,
+                    className='dash-dropdown',
+                    style={'width': '100%', 'color': 'black'}
+                )
+            ]),
             html.Div('FILTERS', style={'color': COLORS['text'], 'fontSize': '15px', 'fontWeight': 'bold', 'marginBottom': '15px', 'borderBottom': '1px solid #4a6fa5', 'paddingBottom': '10px'}),
             *[make_filter_section(g) for g in filter_groups],
             # html.Button('Apply Filters', id='apply-filters', n_clicks=0, style={
@@ -1198,22 +1220,48 @@ for group in filter_groups:
         return {'display': 'none'}, '▸'
 
 
-# --- Click no globo ---
+# --- Click no globo e Barra de Pesquisa combinados ---
 @callback(
     Output('selected-object-idx', 'data'),
     Output('selected-norad-id',   'data'),
+    Output('satellite-search-bar', 'value'), # 👈 Sincroniza o texto da barra ao clicar no globo
     Input('globe-3d', 'clickData'),
+    Input('satellite-search-bar', 'value'),  # 👈 Ouve a tua nova barra de pesquisa
     prevent_initial_call=True
 )
-def store_click(click_data):
-    if click_data is None: return None, None
-    try:
-        pt = click_data['points'][0]
-        cd = pt.get('customdata')
-        if cd is not None: return int(cd[0]), int(cd[7])
-    except Exception as ex:
-        print(f"store_click error: {ex}")
-    return None, None
+def store_click(click_data, search_value):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
+
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # CÉNARIO 1: O utilizador escreveu e escolheu algo na Barra de Pesquisa
+    if trigger_id == 'satellite-search-bar':
+        if search_value is None:
+            return None, None, None
+        try:
+            # Vê qual é o NORAD_CAT_ID correspondente a esse index no teu df_3d
+            norad_id = int(df_3d.loc[search_value, 'NORAD_CAT_ID'])
+            return search_value, norad_id, search_value
+        except Exception as ex:
+            print(f"Search bar error: {ex}")
+            return None, None, None
+
+    # CENÁRIO 2: O utilizador clicou com o rato diretamente num ponto do Globo 3D
+    if trigger_id == 'globe-3d' and click_data:
+        try:
+            pt = click_data['points'][0]
+            cd = pt.get('customdata')
+            if cd is not None:
+                idx = int(cd[0])
+                norad_id = int(cd[7])
+                # Devolve o Index, o NORAD ID, e preenche a barra com este satélite!
+                return idx, norad_id, idx
+        except Exception as ex:
+            print(f"store_click error: {ex}")
+            
+    return None, None, None
 
 
 # --- Label do slider de tempo ---
@@ -1534,7 +1582,6 @@ def back_to_table(n_clicks, modal_style):
     if n_clicks:
         return {**modal_style, 'display': 'flex'}, False
     return dash.no_update, dash.no_update
-
 
 if __name__ == '__main__':
     app.run(debug=True)
