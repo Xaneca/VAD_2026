@@ -868,7 +868,21 @@ layout = html.Div(style={
         ]),
         html.Div(style={**card_style, 'gridColumn': '3 / 5', 'gridRow': '1 / 3', 'justifyContent': 'space-between', 'padding': '15px'}, children=[
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center', 'width': '100%', 'marginBottom': '10px'}, children=[
-                html.Div('TOP CONSTELLATIONS', style={'color': COLORS['text'], 'fontSize': '14px', 'fontWeight': 'bold'}),
+                # Adicionado o ID para o título mudar sozinho
+                html.Div('TOP CONSTELLATIONS', id='bar-chart-title', style={'color': COLORS['text'], 'fontSize': '14px', 'fontWeight': 'bold'}),
+                
+                # Seletor discreto de rádio inline
+                dcc.RadioItems(
+                    id='bar-toggle',
+                    options=[
+                        {'label': ' Constellations', 'value': 'CONST'},
+                        {'label': ' Countries', 'value': 'COUNTRY'}
+                    ],
+                    value='CONST', # Modo inicial padrão
+                    inline=True,
+                    className='cyber-toggle',
+                    labelStyle={'marginRight': '12px', 'cursor': 'pointer'}
+                )
             ]),
             dcc.Graph(id='bar-constellations', figure=fig_bar, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
@@ -1307,6 +1321,7 @@ def update_time_label(hours):
     Output('kpi-d-count', 'children'),
     Output('utc-clock-display', 'children'), 
     Output('utc-clock-display', 'style'),    
+    Output('bar-chart-title', 'children'),
     Input('live-update-interval', 'n_intervals'),
     Input('selected-object-idx',  'data'),
     Input('close-modal-btn',      'n_clicks'),
@@ -1315,11 +1330,12 @@ def update_time_label(hours):
     Input('filter-constellation', 'value'),         
     Input('filter-object_type',   'value'),         
     Input('filter-altitude',      'value'),        
-    Input('filter-inclination',   'value'),        
+    Input('filter-inclination',   'value'),  
+    Input('bar-toggle',           'value'),      
     prevent_initial_call=False
 )
 def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
-                 orbit_vals, const_vals, obj_type_vals, alt_range, inc_range):
+                 orbit_vals, const_vals, obj_type_vals, alt_range, inc_range, bar_mode):
     global df_3d
 
     ctx = dash.callback_context
@@ -1332,7 +1348,7 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
     is_initial_load = not triggers or trigger_principal in ['', '.', None]
     is_first_tick = ('live-update-interval' in triggers and n_intervals == 0)
     
-    filtros = ['filter-orbit', 'filter-constellation', 'filter-object_type', 'filter-altitude', 'filter-inclination']
+    filtros = ['filter-orbit', 'filter-constellation', 'filter-object_type', 'filter-altitude', 'filter-inclination', 'bar-toggle']
     is_filter_change = any(f in triggers for f in filtros)
 
     # 3. Atualiza os gráficos se for o arranque, o 1º tick do relógio, ou se mexerem num filtro
@@ -1431,8 +1447,34 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
         )
 
         # 2. Gráfico de Barras (Top Constelações)
-        top_const = df_f[df_f['CONSTELLATION'] != 'Other']['CONSTELLATION'].value_counts().head(6)
-        fig_bar = go.Figure(data=[go.Bar(x=top_const.index.tolist(), y=top_const.values, marker_color='#4a6fa5')])
+        top_const = df_f[df_f['CONSTELLATION'] != 'Other']['CONSTELLATION'].value_counts().head(10)
+        
+        if bar_mode == 'COUNTRY':
+            # Varre o teu dataset filtrado à procura da coluna correspondente ao país do satélite
+            country_col = None
+            for col in ['COUNTRY', 'COUNTRY_CODE', 'OWNER']:
+                if col in df_f.columns:
+                    country_col = col
+                    break
+            
+            if country_col and not df_f.empty:
+                top_data = df_f[df_f[country_col].notnull()][country_col].value_counts().head(10)
+            else:
+                top_data = pd.Series(dtype=int)
+            chart_title = "TOP COUNTRIES"
+            marker_color = '#e66b8b' # Muda para a cor rosa coral para dar um feedback visual de mudança
+        else:
+            top_data = df_f[df_f['CONSTELLATION'] != 'Other']['CONSTELLATION'].value_counts().head(10)
+            chart_title = "TOP CONSTELLATIONS"
+            marker_color = '#4a6fa5' # Teu azul padrão original
+
+        fig_bar = go.Figure(data=[go.Bar(x=top_data.index.tolist(), y=top_data.values, marker_color=marker_color)])
+        fig_bar.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20,r=20,t=10,b=20),
+            xaxis=dict(showgrid=False, color='white', tickfont=dict(size=10)),
+            yaxis=dict(showgrid=True, gridcolor='#2d3748', color='white', tickfont=dict(size=10))
+        )
+
         fig_bar.update_layout(
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20,r=20,t=10,b=20),
             xaxis=dict(showgrid=False, color='white', tickfont=dict(size=10)),
@@ -1491,6 +1533,7 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
         fig_bar  = dash.no_update
         fig_viol = dash.no_update
         fig_line = dash.no_update
+        chart_title = dash.no_update
 
     # operational status code
     status_col = 'OPS_STATUS_CODE'
@@ -1543,9 +1586,10 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
         texto_o_novo,           # 10. kpi-o-count.children
         texto_ar_novo,          # 11. kpi-ar-count.children
         texto_r_novo,           # 12. kpi-r-count.children
-        texto_d_novo,           # 13. kpi-d-count.children
+        texto_d_novo,,           # 13. kpi-d-count.children
         clock_text,             # 14. utc-clock-display.children
         clock_style             # 15. utc-clock-display.style
+        chart_title
     )
 
 # --- Modal abertura/fecho ---
