@@ -19,7 +19,7 @@ tle = pd.read_csv(f'{path}/DATASETS_SATTELITES/merged_dataset_tle.csv')
 dash.register_page(__name__, name='Satellites', path='/')
 
 # ============================================================
-# PREPARAR DADOS 3D (Versão SGP4 ECI para ECEF)
+# PREPARAR DADOS TRIDIMENSIONAIS
 # ============================================================
 def prepare_3d_data(df):
     print("Valor inicial de objetos:", len(df))
@@ -99,7 +99,7 @@ df_3d = prepare_3d_data(tle)
 print(f"✅ Objectos 3D carregados: {len(df_3d):,}")
 
 # ============================================================
-# OTIMIZAÇÃO LIVE UPDATE (Vetorização SGP4)
+# OTIMIZACAO LIVE UPDATE
 # ============================================================
 print("⏳ A pré-processar satélites para live updates...")
 lista_satrecs = []
@@ -113,7 +113,7 @@ SAT_ARRAY = SatrecArray(lista_satrecs)
 print("✅ SatrecArray criado com sucesso para o Live Update.")
 
 # ============================================================
-# CACHE E CÁLCULO DE CONJUNÇÕES (SGP4 real)
+# CACHE E CALCULO DE CONJUNCOES
 # ============================================================
 _CONJ_CACHE = None
 
@@ -139,9 +139,9 @@ def _get_cache(df):
 
 def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_minutes=2.0, top_n=10, buffer_km=75.0):
     """
-    Análise de conjunções usando SGP4.
-    Passo 1: Grid Grosseiro (step_minutes) para encontrar mínimas genéricas.
-    Passo 2: Grid Fino (1 segundo) para identificar o TCA exato (Time of Closest Approach).
+    Analise de conjuncoes usando SGP
+    Passo: Grid Grosseiro para encontrar minimas genericas
+    Passo: Grid Fino para identificar o TCA exato
     """
     df_c = _get_cache(tle_dataframe)
     target_norad_id = int(target_norad_id)
@@ -172,11 +172,11 @@ def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_m
     jd_base, fr_base = jday(now_utc.year, now_utc.month, now_utc.day,
                             now_utc.hour, now_utc.minute, now_utc.second)
     
-    # [CORREÇÃO]: Preservar o fr_base e aplicar o offset apenas à fração de dia
+    # Preservar o fr_base e aplicar o offset apenas a fracao de dia
     jd_arr_coarse = np.full(n_steps, jd_base)
     fr_arr_coarse = fr_base + np.arange(n_steps) * step_days
 
-    # Propagar alvo (Coarse)
+    # Propagar alvo
     try:
         tgt_sat     = Satrec.twoline2rv(tgt_row['TLE_LINE1'], tgt_row['TLE_LINE2'])
         tgt_array   = SatrecArray([tgt_sat])
@@ -214,15 +214,15 @@ def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_m
         min_i_valid = dists.argmin()
         min_d_coarse = dists[min_i_valid]
         
-        # Recuperar índice temporal exato original
+        # Recuperar indice temporal exato original
         time_idx_coarse = np.where(valid_mask)[0][min_i_valid]
         best_fr    = fr_arr_coarse[time_idx_coarse]
         final_dist = min_d_coarse
 
-        # [CORREÇÃO]: Passo Fino (Refinamento de 1 segundo se Risco Elevado)
-        if min_d_coarse < 200.0:  # Zoom em aproximações < 200km
-            fine_steps = 240 # +/- 2 minutos em torno do encontro grosseiro
-            fine_step_days = 1.0 / 86400.0 # 1 segundo 
+        # Passo Fino Refinamento se Risco Elevado
+        if min_d_coarse < 200.0:  # Zoom em aproximacoes curtas
+            fine_steps = 240 # Minutos em torno do encontro grosseiro
+            fine_step_days = 1.0 / 86400.0 # Segundo 
             fr_arr_fine = best_fr + (np.arange(fine_steps) - fine_steps/2) * fine_step_days
             jd_arr_fine = np.full(fine_steps, jd_base)
             
@@ -236,11 +236,11 @@ def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_m
                 dists_f = np.linalg.norm(diff_f, axis=1)
                 min_i_f = dists_f.argmin()
                 
-                # Substituir pelo TCA real encontrado em precisão de 1 seg
+                # Substituir pelo TCA real encontrado em precisao
                 final_dist = dists_f[min_i_f]
                 best_fr = fr_arr_fine[np.where(valid_f)[0][min_i_f]]
 
-        # [CORREÇÃO]: Cálculo limpo de offset para preservar precisão UTC
+        # Calculo limpo de offset para preservar precisao UTC
         offset_days = best_fr - fr_base
         conj_time = now_utc + timedelta(days=float(offset_days))
 
@@ -248,7 +248,7 @@ def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_m
             'NAME':        str(cand_row['NAME']),
             'NORAD_ID':    int(cand_row['NORAD_CAT_ID']),
             'MIN_DIST_KM': round(float(final_dist), 2),
-            # Guardamos os segundos de forma estrita!
+            # Guardamos os segundos de forma estrita
             'TIME_UTC':    conj_time.strftime('%Y-%m-%d %H:%M:%S'),
         })
 
@@ -260,14 +260,14 @@ def run_live_conjunction_analysis(target_norad_id, tle_dataframe, days=7, step_m
 
 
 # ============================================================
-# ÓRBITA COMPLETA (SGP4)
+# ORBITA COMPLETA
 # ============================================================
 def compute_orbit_line(row, target_time, n_points=300):
     sat = Satrec.twoline2rv(row['TLE_LINE1'], row['TLE_LINE2'])
     period_minutes = float(row['PERIOD'])
     X, Y, Z = [], [], []
     
-    # Para garantir alinhamento perfeito, começamos a linha meia órbita ANTES do momento alvo
+    # Para garantir alinhamento perfeito, comecamos a linha meia orbita ANTES do momento alvo
     start_time = target_time - timedelta(minutes=period_minutes / 2)
     
     for i in range(n_points):
@@ -284,7 +284,7 @@ def compute_orbit_line(row, target_time, n_points=300):
     return X, Y, Z
 
 # ============================================================
-# HELPER: posição de um satélite num instante específico (ECEF)
+# HELPER posicao de um satelite num instante especifico
 # ============================================================
 def get_position_at_time(tle_row, target_dt):
     """Retorna (x, y, z) em ECEF para um dado datetime UTC."""
@@ -308,7 +308,7 @@ def get_position_at_time(tle_row, target_dt):
         return None
 
 # ============================================================
-# LIVE UPDATE DE POSIÇÕES
+# LIVE UPDATE DE POSICOES
 # ============================================================
 def update_live_positions(df):
     tempo_atual = datetime.utcnow()
@@ -329,7 +329,7 @@ def update_live_positions(df):
     return df
 
 # ============================================================
-# GLOBO 3D E ESTILOS
+# GLOBO E ESTILOS
 # ============================================================
 def build_earth_surface():
     phi   = np.linspace(0, 2*np.pi, 180)
@@ -432,16 +432,16 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
 
     if orbit_row is not None:
         try:
-            # Identifica qual é o tempo que o globo está a observar (live ou com offset do slider)
+            # Identifica qual e o tempo que o globo esta a observar live ou com offset do slider
             dt_base = target_time if target_time is not None else datetime.utcnow()
             
-            # Passa esse dt_base para o cálculo da linha e da conversão
+            # Passa esse dt_base para o calculo da linha e da conversao
             ox, oy, oz = compute_orbit_line(orbit_row, dt_base)
             ox_ecef, oy_ecef, oz_ecef = _eci_orbit_to_ecef(ox, oy, oz, dt_base)
             
             fig.add_trace(go.Scatter3d(
                 x=ox_ecef, y=oy_ecef, z=oz_ecef, mode='lines',
-                line=dict(color='white', width=2),
+                line=dict(color='yellow', width=2),
                 name=f"Orbit: {orbit_row['NAME']}",
                 hoverinfo='skip', showlegend=True, uirevision='constant'
             ))
@@ -457,7 +457,7 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
 
             fig.add_trace(go.Scatter3d(
                 x=[sx], y=[sy], z=[sz], mode='markers',
-                marker=dict(size=6, color='white', symbol='diamond',
+                marker=dict(size=6, color='yellow', symbol='diamond',
                             line=dict(color='yellow', width=2)),
                 name='Selected',
                 hovertemplate=f"<b>{orbit_row['NAME']}</b><extra></extra>",
@@ -499,7 +499,7 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
         conj_dt = datetime.strptime(conjunction_time_str, '%Y-%m-%d %H:%M:%S')
     except:
         try:
-            # Fallback de segurança para o formato antigo
+            # Fallback de seguranca para o formato antigo
             conj_dt = datetime.strptime(conjunction_time_str, '%Y-%m-%d %H:%M')
         except:
             conj_dt = datetime.utcnow()
@@ -520,9 +520,9 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
             hoverinfo='skip', showlegend=False
         ))
 
-    # ── Para a Órbita Primária ──
+    # Para a Orbita Primaria
     try:
-        # Adicionar conj_dt como segundo argumento
+        # Adicionar dt de conjuncao como segundo argumento
         ox, oy, oz = compute_orbit_line(primary_row, conj_dt) 
         ox_e, oy_e, oz_e = _eci_orbit_to_ecef(ox, oy, oz, conj_dt)
         fig.add_trace(go.Scatter3d(
@@ -534,9 +534,9 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
     except Exception as ex:
         print(f"Erro órbita primária: {ex}")
 
-    # ── Para a Órbita Secundária ──
+    # Para a Orbita Secundaria
     try:
-        # Adicionar conj_dt como segundo argumento
+        # Adicionar dt de conjuncao como segundo argumento
         ox2, oy2, oz2 = compute_orbit_line(secondary_row, conj_dt)
         ox2_e, oy2_e, oz2_e = _eci_orbit_to_ecef(ox2, oy2, oz2, conj_dt)
         fig.add_trace(go.Scatter3d(
@@ -563,7 +563,7 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
     if pos2:
         fig.add_trace(go.Scatter3d(
             x=[pos2[0]], y=[pos2[1]], z=[pos2[2]], mode='markers',
-            marker=dict(size=7, color='#ff6b35', symbol='diamond',
+            marker=dict(size=7, color='#ff6b35', symbol='square',
                         line=dict(color='white', width=2)),
             name=secondary_row['NAME'],
             hovertemplate=f"<b>{secondary_row['NAME']}</b><br>{conjunction_time_str} UTC<extra></extra>",
@@ -597,7 +597,7 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
 
 
 # ============================================================
-# GRÁFICOS SECUNDÁRIOS E VARIÁVEIS DE DESIGN
+# GRAFICOS SECUNDARIOS E VARIAVEIS DE DESIGN
 # ============================================================
 fig_type_object = go.Figure(data=[go.Pie(
     values=df_3d['OBJECT_TYPE'].value_counts().values,
@@ -634,10 +634,10 @@ v_style = dict(box_visible=False, line_color='#4a6fa5', fillcolor='#2d4a6f', opa
 
 fig_violin = go.Figure()
 
-# Adicionamos apenas a visualização principal ("ALL"), pois os filtros tratam do resto
+# Adicionamos apenas a visualizacao principal pois os filtros tratam do resto
 fig_violin.add_trace(go.Violin(y=get_sample(mask_all), visible=True, name='ALL', **v_style))
 
-# Layout limpo, sem a secção updatemenus
+# Layout limpo sem a seccao updatemenus
 fig_violin.update_layout(
     paper_bgcolor='rgba(0,0,0,0)',
     plot_bgcolor='rgba(0,0,0,0)',
@@ -650,16 +650,15 @@ fig_violin.update_layout(
 df_3d['LAUNCH_YEAR'] = pd.to_datetime(df_3d['LAUNCH_DATE'], errors='coerce').dt.year
 launches = df_3d.groupby('LAUNCH_YEAR').size().reset_index(name='count')
 
-# --- NOVO: Ordenar por ano e calcular a soma cumulativa ---
+# Ordenar por ano e calcular a soma cumulativa
 launches = launches.sort_values('LAUNCH_YEAR')
 launches['cumulative_count'] = launches['count'].cumsum()
-# --------------------------------------------------------
 
 launches = launches[launches['LAUNCH_YEAR'] >= 1960]
 
 fig_line = go.Figure(data=[go.Scatter(
     x=launches['LAUNCH_YEAR'], 
-    y=launches['cumulative_count'], # <-- Usar a nova coluna cumulativa
+    y=launches['cumulative_count'], # Usar a nova coluna cumulativa
     mode='lines+markers',
     line=dict(color='#4a6fa5', width=2), marker=dict(size=4),
     hovertemplate="<b>Year:</b> %{x}<br><b>Total Objects:</b> %{y}<extra></extra>" # Tooltip melhorado
@@ -695,9 +694,9 @@ button_style = {
 }
 
 filter_groups = [
-    {'id': 'orbit',        'label': '🛸 Orbit Type',      'options': ['LEO','MEO','GEO','HEO'],                                                                                           'default': ['LEO','MEO','GEO','HEO']},
+    {'id': 'orbit',        'label': '🛸 Orbit Type',      'options': ['LEO','MEO','GEO','HEO'],                                                                                                       'default': ['LEO','MEO','GEO','HEO']},
     {'id': 'constellation','label': '🌐 Constellation',    'options': ['Starlink','OneWeb','Iridium','GPS','GLONASS','Galileo','BeiDou','COSMOS','FengYun','GOES','NOAA','ISS','Hubble','Other'], 'default': ['Starlink','OneWeb','Iridium','GPS','GLONASS','Galileo','BeiDou','COSMOS','FengYun','GOES','NOAA','ISS','Hubble','Other']},
-    {'id': 'object_type',  'label': '🔷 Object Type',      'options': ['Satellite','Debris','Rocket Body','Space Station','Component','In Analysis','Unknown'],                             'default': ['Satellite']},
+    {'id': 'object_type',  'label': '🔷 Object Type',      'options': ['Satellite','Debris','Rocket Body','Space Station','Component','In Analysis','Unknown'],                                     'default': ['Satellite']},
     {'id': 'altitude',     'label': '📏 Altitude (km)',    'type': 'range', 'min': 0, 'max': 40000, 'default': [0, 40000]},
     {'id': 'inclination',  'label': '📐 Inclination (°)',  'type': 'range', 'min': 0, 'max': 180,   'default': [0, 180]},
 ]
@@ -729,7 +728,7 @@ def make_filter_section(group):
 
 
 # ============================================================
-# ATMOSPHERIC RE-ENTRIES (CUMULATIVE DATA PROCESS)
+# ATMOSPHERIC RE ENTRIES CUMULATIVE DATA PROCESS
 # ============================================================
 df_3d['DECAY_DATE'] = pd.to_datetime(df_3d['DECAY_DATE'], errors='coerce')
 df_3d['LAUNCH_DATE'] = pd.to_datetime(df_3d['LAUNCH_DATE'], errors='coerce')
@@ -737,7 +736,7 @@ df_3d['LAUNCH_DATE'] = pd.to_datetime(df_3d['LAUNCH_DATE'], errors='coerce')
 # Filtrar apenas os que reentraram
 reentered_df = df_3d[df_3d['DECAY_DATE'].notnull()].copy()
 
-# 1. Gráfico da Esquerda: Cumulativo ao longo do tempo
+# Grafico da Esquerda Cumulativo ao longo do tempo
 reentered_df_sorted = reentered_df.sort_values('DECAY_DATE')
 daily_reentries = reentered_df_sorted.groupby('DECAY_DATE').size().reset_index(name='Daily_Count')
 daily_reentries['Cumulative_Reentries'] = daily_reentries['Daily_Count'].cumsum()
@@ -757,14 +756,14 @@ fig_reentered.update_layout(
     yaxis=dict(color='white', showgrid=True, gridcolor='#2d3748', title="Total Re-entered Objects")
 )
 
-# 2. Gráfico da Direita: Histograma de tempo em órbita (em anos)
+# Grafico da Direita Histograma de tempo em orbita
 reentered_df['DAYS_IN_ORBIT'] = (reentered_df['DECAY_DATE'] - reentered_df['LAUNCH_DATE']).dt.days
 reentered_df['YEARS_IN_ORBIT'] = reentered_df['DAYS_IN_ORBIT'] / 365.25
-reentered_df = reentered_df[reentered_df['YEARS_IN_ORBIT'] >= 0] # Remover possíveis erros de dados de datas
+reentered_df = reentered_df[reentered_df['YEARS_IN_ORBIT'] >= 0] # Remover possiveis erros de dados de datas
 
 fig_lifespan = go.Figure(go.Histogram(
     x=reentered_df['YEARS_IN_ORBIT'],
-    xbins=dict(start=0, end=25, size=1), # Agrupado de 1 em 1 ano
+    xbins=dict(start=0, end=25, size=1), # Agrupado por ano
     marker_color='#00d4ff',
     opacity=0.8,
     hovertemplate="<b>Lifespan:</b> %{x} years<br><b>Objects:</b> %{y}<extra></extra>"
@@ -778,7 +777,7 @@ fig_lifespan.update_layout(
 )
 
 # ============================================================
-# APP INICIALIZAÇÃO
+# APP INICIALIZACAO
 # ============================================================
 app = dash.Dash(__name__, suppress_callback_exceptions=True)
 
@@ -795,13 +794,13 @@ app.index_string = '''
                 display: none !important;
             }
 
-            /* 1. Remover DEFINITIVAMENTE os 3 pontos (...) da coluna de seleção */
+            /* Remover definitivamente os pontos da coluna de selecao */
             td.dash-select-cell, 
             td.dash-select-cell .dash-cell-value {
                 text-overflow: clip !important;
-                font-size: 0px !important;     /* Esconde os pontos forçando tamanho zero */
-                color: transparent !important; /* Torna invisível qualquer resquício */
-                max-width: 40px !important;    /* Dá espaço para o quadrado não ser esmagado */
+                font-size: 0px !important;     /* Esconde os pontos forcando tamanho zero */
+                color: transparent !important; /* Torna invisivel qualquer resquicio */
+                max-width: 40px !important;    /* Da espaco para o quadrado nao ser esmagado */
                 overflow: visible !important;
             }
 
@@ -872,23 +871,23 @@ layout = html.Div(style={
         'gridTemplateRows': '220px 80px 650px 450px',
         'gap': '15px', 'width': '100%',
     }, children=[
-        # Linha 1
+        # Secao
         html.Div(style={**card_style, 'gridColumn': '1 / 3', 'gridRow': '1'}, children=[
             dcc.Graph(id='pie-type-object', figure=fig_type_object, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%'})
         ]),
         html.Div(style={**card_style, 'gridColumn': '3 / 5', 'gridRow': '1 / 3', 'justifyContent': 'space-between', 'padding': '15px'}, children=[
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center', 'width': '100%', 'marginBottom': '10px'}, children=[
-                # Adicionado o ID para o título mudar sozinho
+                # Adicionado o ID para o titulo mudar sozinho
                 html.Div('TOP CONSTELLATIONS', id='bar-chart-title', style={'color': COLORS['text'], 'fontSize': '14px', 'fontWeight': 'bold'}),
                 
-                # Seletor discreto de rádio inline
+                # Seletor discreto de radio inline
                 dcc.RadioItems(
                     id='bar-toggle',
                     options=[
                         {'label': ' Constellations', 'value': 'CONST'},
                         {'label': ' Countries', 'value': 'COUNTRY'}
                     ],
-                    value='CONST', # Modo inicial padrão
+                    value='CONST', # Modo inicial padrao
                     inline=True,
                     className='cyber-toggle',
                     labelStyle={'marginRight': '12px', 'cursor': 'pointer'}
@@ -897,7 +896,7 @@ layout = html.Div(style={
             dcc.Graph(id='bar-constellations', figure=fig_bar, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
 
-        # Linha 2
+        # Secao
 
         # Status
         html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '2', 'padding': '5px 10px'}, children=[
@@ -937,12 +936,12 @@ layout = html.Div(style={
             ])
         ]),
 
-        # donu graph for percentage of objects selected
+        # Grafico circular para percentagem de objetos selecionados
         html.Div(style={**card_style, 'gridColumn': '2', 'gridRow': '2'}, children=[
             dcc.Graph(id='kpi-pct-graph', figure=fig_pct, config={'displayModeBar': False}, style={'width': '70px', 'height': '70px'})
         ]),
 
-        # Linha 3 - Globo
+        # Globo
         html.Div(id='globe-container', style={
             **card_style, 'gridColumn': '1 / 4', 'gridRow': '3',
             'position': 'relative', 'padding': '0', 'overflow': 'hidden'
@@ -954,21 +953,19 @@ layout = html.Div(style={
             ),
 
             # Slider de viagem no tempo
-            # Slider de viagem no tempo
             html.Div(id='time-travel-container', style={
                 'position': 'absolute', 'bottom': '20px', 'left': '20px',
                 'backgroundColor': 'rgba(13,20,33,0.85)', 'backdropFilter': 'blur(5px)',
-                'borderRadius': '10px', 'padding': '12px 16px 8px 16px', # padding ligeiramente ajustado
+                'borderRadius': '10px', 'padding': '12px 16px 8px 16px', # Padding ligeiramente ajustado
                 'border': '1px solid #2d3748', 'zIndex': '10', 'width': '260px',
             }, children=[
-                # --- NOVO RELÓGIO AQUI ---
+                # Relogio HTML
                 html.Div(id='utc-clock-display', children='🕒 A calcular...', style={
                     'color': 'white', 'fontSize': '14px', 'fontFamily': 'monospace', 
                     'textAlign': 'center', 'marginBottom': '12px',
                     'backgroundColor': 'rgba(0,0,0,0.6)', 'padding': '6px', 
                     'borderRadius': '6px', 'border': '1px solid #2d3748'
                 }),
-                # -------------------------
                 html.Div(style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'marginBottom': '6px'}, children=[
                     html.Span('⏱ Time travel', style={'color': '#ffd700', 'fontSize': '11px', 'fontWeight': 'bold', 'letterSpacing': '0.5px'}),
                     html.Span(id='time-travel-label', children='+0h (Now)',
@@ -990,7 +987,7 @@ layout = html.Div(style={
                 ),
             ]),
 
-            # Painel de informação do satélite
+            # Painel de informacao do satelite
             html.Div(id='selected-info', style={
                 'position': 'absolute', 'bottom': '20px', 'right': '20px',
                 'backgroundColor': 'rgba(26,35,50,0.85)', 'backdropFilter': 'blur(5px)',
@@ -1019,7 +1016,7 @@ layout = html.Div(style={
                 }),
                 dcc.Dropdown(
                     id='satellite-search-bar',
-                    # Criamos uma lista inteligente: mostra "NOME (ID)" mas guarda o INDEX do pandas!
+                    # Lista inteligente que mostra nome e id mas guarda o index
                     options=[
                         {
                             'label': f"{str(row['NAME'])} ({str(int(row['NORAD_CAT_ID']))})", 
@@ -1037,7 +1034,7 @@ layout = html.Div(style={
             *[make_filter_section(g) for g in filter_groups],
         ]),
 
-        # Linha 4
+        # Secao
         html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '4', 'padding': '15px', 'display': 'flex', 'flexDirection': 'column', 'minHeight': '350px'}, children=[
             html.Div(style={'textAlign': 'center', 'marginBottom': '5px'}, children=[
                 html.Div('ALTITUDE DENSITY', style={'color': COLORS['text'], 'fontSize': '12px', 'fontWeight': 'bold'}),
@@ -1062,7 +1059,7 @@ layout = html.Div(style={
     ]),
 
     # ============================================================
-    # Modal Conjunções
+    # Modal Conjuncoes
     # ============================================================
     html.Div(id='conjunction-modal', style={
         'display': 'none', 'position': 'fixed', 'top': '0', 'left': '0',
@@ -1126,10 +1123,10 @@ layout = html.Div(style={
                         'backgroundColor': '#1a2332', 'color': '#e2e8f0', 'textAlign': 'left',
                         'border': 'none', 'borderBottom': '1px solid #2d3748',
                         'padding': '6px 10px', 'fontSize': '12px'
-                        # Removemos o overflow, textOverflow e maxWidth daqui!
+                        # Removemos as restricoes de tamanho
                     },
                     style_cell_conditional=[
-                        # Aplicamos os 3 pontos APENAS à coluna do Nome do satélite
+                        # Aplicamos os pontos apenas a coluna do Nome do satelite
                         {'if': {'column_id': 'NAME'},        
                          'width': '38%', 'overflow': 'hidden', 'textOverflow': 'ellipsis', 'maxWidth': '150px'},
                         {'if': {'column_id': 'NORAD_ID'},    'width': '14%'},
@@ -1139,15 +1136,15 @@ layout = html.Div(style={
                     style_data_conditional=[
                         {'if': {'row_index': 'odd'}, 'backgroundColor': '#162030'},
                         
-                        # Risco Alto (< 10 km) - Vermelho Neon
+                        # Risco Alto Vermelho Neon
                         {'if': {'filter_query': '{MIN_DIST_KM} < 10'},
                          'backgroundColor': 'rgba(255,75,75,0.15)', 'color': '#ff4b4b', 'fontWeight': 'bold'},
                          
-                        # Risco Moderado (10 a 100 km) - Amarelo
+                        # Risco Moderado Amarelo
                         {'if': {'filter_query': '{MIN_DIST_KM} >= 10 && {MIN_DIST_KM} < 100'},
                          'backgroundColor': 'rgba(255,215,0,0.08)', 'color': '#ffd700'},
                          
-                        # Linha em hover / focada
+                        # Linha em hover focada
                         {'if': {'state': 'active'},
                          'backgroundColor': '#2d3748', 'border': '1px solid #4a6fa5'},
                          
@@ -1168,8 +1165,8 @@ layout = html.Div(style={
     ]),
 
     # ============================================================
-    # Modal dedicado para visualização de órbitas de conjunção
-    # (janela isolada em fullscreen, sobre tudo o resto)
+    # Modal dedicado para visualizacao de orbitas de conjuncao
+    # Janela isolada em fullscreen sobre tudo o resto
     # ============================================================
     html.Div(id='conj-orbit-modal', style={
         'display': 'none', 'position': 'fixed', 'top': '0', 'left': '0',
@@ -1182,40 +1179,40 @@ layout = html.Div(style={
             'width': '92vw', 'height': '90vh',
             'backgroundColor': '#0d1421',
             'borderRadius': '16px',
-            'border': '1px solid #00d4ff', # <--- Trocado de laranja para ciano
+            'border': '1px solid #00d4ff', # Borda ciano
             'display': 'flex', 'flexDirection': 'column',
             'overflow': 'hidden', 'position': 'relative',
-            'boxShadow': '0 0 40px rgba(0, 212, 255, 0.15)', # <--- Glow agora é ciano subtil
+            'boxShadow': '0 0 40px rgba(0, 212, 255, 0.15)', # Glow ciano subtil
         }, children=[
-            # Barra de título do modal de órbitas
+            # Barra de titulo do modal de orbitas
             html.Div(style={
                 'display': 'flex', 'alignItems': 'center',
                 'justifyContent': 'space-between',
                 'padding': '12px 20px',
                 'backgroundColor': '#0d1421',
-                'borderBottom': '1px solid #2d3748', # <--- Trocado para o cinza/azul padrão do tema
+                'borderBottom': '1px solid #2d3748', # Borda cinza ou azul
                 'flexShrink': '0',
             }, children=[
                 html.Span(id='conj-orbit-title', children='',
-                          style={'color': '#00d4ff', 'fontSize': '14px', # <--- Trocado para ciano
+                          style={'color': '#00d4ff', 'fontSize': '14px', # Texto ciano
                                  'fontWeight': 'bold', 'letterSpacing': '0.5px',
                                  'flex': '1', 'marginRight': '16px'}),
                 html.Div(style={'display': 'flex', 'gap': '10px', 'flexShrink': '0'}, children=[
-                    html.Button('← Back to Table', id='conj-back-btn', n_clicks=0, style={ # <--- TRADUZIDO
+                    html.Button('← Back to Table', id='conj-back-btn', n_clicks=0, style={ # Botao voltar
                         **button_style,
                         'backgroundColor': '#2d3748',
                         'color': '#ffffff',
                         'padding': '5px 14px', 'fontSize': '12px'
                     }),
-                    html.Button('✖ Close', id='conj-close-btn', n_clicks=0, style={ # <--- TRADUZIDO
+                    html.Button('✖ Close', id='conj-close-btn', n_clicks=0, style={ # Botao fechar
                         **button_style,
                         'backgroundColor': '#8B0000', 'color': 'white',
-                        'border': 'none', # Fica mais limpo sem borda
+                        'border': 'none', # Sem borda
                         'padding': '5px 14px', 'fontSize': '12px'
                     }),
                 ]),
             ]),
-            # Globo de conjunção — ocupa toda a área restante
+            # Globo de conjuncao ocupa toda a area restante
             dcc.Graph(
                 id='globe-conjunction', figure=go.Figure(),
                 config={'displayModeBar': True, 'modeBarButtonsToRemove': ['toImage'], 'scrollZoom': True},
@@ -1229,7 +1226,7 @@ layout = html.Div(style={
 # CALLBACKS
 # ============================================================
 
-# --- Filtros collapse ---
+# Filtros collapse
 for group in filter_groups:
     gid = group['id']
     @callback(
@@ -1245,13 +1242,13 @@ for group in filter_groups:
         return {'display': 'none'}, '▸'
 
 
-# --- Click no globo e Barra de Pesquisa combinados ---
+# Clique no globo e Barra de Pesquisa combinados
 @callback(
     Output('selected-object-idx', 'data'),
     Output('selected-norad-id',   'data'),
-    Output('satellite-search-bar', 'value'), # 👈 Sincroniza o texto da barra ao clicar no globo
+    Output('satellite-search-bar', 'value'), # Sincroniza o texto da barra ao clicar no globo
     Input('globe-3d', 'clickData'),
-    Input('satellite-search-bar', 'value'),  # 👈 Ouve a tua nova barra de pesquisa
+    Input('satellite-search-bar', 'value'),  # Ouve a barra de pesquisa
     prevent_initial_call=True
 )
 def store_click(click_data, search_value):
@@ -1261,19 +1258,19 @@ def store_click(click_data, search_value):
 
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    # CÉNARIO 1: O utilizador escreveu e escolheu algo na Barra de Pesquisa
+    # Cenario O utilizador escreveu e escolheu algo na Barra de Pesquisa
     if trigger_id == 'satellite-search-bar':
         if search_value is None:
             return None, None, None
         try:
-            # Vê qual é o NORAD_CAT_ID correspondente a esse index no teu df_3d
+            # Ve qual o id correspondente ao index
             norad_id = int(df_3d.loc[search_value, 'NORAD_CAT_ID'])
             return search_value, norad_id, search_value
         except Exception as ex:
             print(f"Search bar error: {ex}")
             return None, None, None
 
-    # CENÁRIO 2: O utilizador clicou com o rato diretamente num ponto do Globo 3D
+    # Cenario O utilizador clicou com o rato diretamente num ponto do Globo
     if trigger_id == 'globe-3d' and click_data:
         try:
             pt = click_data['points'][0]
@@ -1281,7 +1278,7 @@ def store_click(click_data, search_value):
             if cd is not None:
                 idx = int(cd[0])
                 norad_id = int(cd[7])
-                # Devolve o Index, o NORAD ID, e preenche a barra com este satélite!
+                # Devolve os dados e preenche a barra com este satelite
                 return idx, norad_id, idx
         except Exception as ex:
             print(f"store_click error: {ex}")
@@ -1289,7 +1286,7 @@ def store_click(click_data, search_value):
     return None, None, None
 
 
-# --- Label do slider de tempo ---
+# Label do slider de tempo
 @callback(
     Output('time-travel-label', 'children'),
     Input('time-travel-slider', 'value')
@@ -1310,7 +1307,7 @@ def update_time_label(hours):
     return f"{label}  ({target.strftime('%m-%d %H:%M')})"
 
 
-# --- Globo principal ---
+# Globo principal
 @callback(
     Output('globe-3d', 'figure'),
     Output('satellite-data-container', 'children'),
@@ -1346,21 +1343,21 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
 
     ctx = dash.callback_context
     
-    # 1. Apanhar TODOS os componentes que dispararam o callback (no arranque podem ser vários)
+    # Apanhar todos os componentes que dispararam o callback
     triggers = [t['prop_id'].split('.')[0] for t in ctx.triggered] if ctx.triggered else []
     trigger_principal = triggers[0] if triggers else None
 
-    # 2. Lógica robusta de deteção:
+    # Logica robusta de detecao
     is_initial_load = not triggers or trigger_principal in ['', '.', None]
     is_first_tick = ('live-update-interval' in triggers and n_intervals == 0)
     
     filtros = ['filter-orbit', 'filter-constellation', 'filter-object_type', 'filter-altitude', 'filter-inclination', 'bar-toggle']
     is_filter_change = any(f in triggers for f in filtros)
 
-    # 3. Atualiza os gráficos se for o arranque, o 1º tick do relógio, ou se mexerem num filtro
+    # Atualiza os graficos no arranque tick do relogio ou alteracao de filtro
     update_secondary_charts = is_initial_load or is_first_tick or is_filter_change
 
-    # 4. Atualiza as posições do globo apenas se for o relógio ou ao fechar o modal
+    # Atualiza as posicoes do globo apenas com o relogio ou ao fechar o modal
     if trigger_principal in ['live-update-interval', 'close-modal-btn']:
         df_3d = update_live_positions(df_3d)
 
@@ -1396,7 +1393,7 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             }),
             html.Div(style={'display': 'grid', 'gridTemplateColumns': '1fr 1fr', 'gap': '12px'}, children=[
                 kpi('Altitude',    f"{orbit_row['ALTITUDE']:.0f} km"),
-                kpi('Orbit',      orbit_row['ORBIT_TYPE']),
+                kpi('Orbit',       orbit_row['ORBIT_TYPE']),
                 kpi('Inclination',  f"{orbit_row['INCLINATION']:.1f}°"),
                 kpi('Period',     f"{orbit_row['PERIOD']:.1f} min"),
                 kpi('Constellation', orbit_row['CONSTELLATION']),
@@ -1434,11 +1431,11 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
     
 
     # ============================================================
-    # RE-GERAR GRÁFICOS SECUNDÁRIOS COM DADOS FILTRADOS (df_f)
+    # RE-GERAR GRAFICOS SECUNDARIOS COM DADOS FILTRADOS
     # ============================================================
     
     if update_secondary_charts:
-        # 1. Gráfico Circular (Tipos de Objeto)
+        # Grafico Circular Tipos de Objeto
         type_counts = df_f['OBJECT_TYPE'].value_counts()
         fig_pie = go.Figure(data=[go.Pie(
             values=type_counts.values,
@@ -1452,11 +1449,11 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             annotations=[dict(text='Type<br>object', x=0.5, y=0.5, font_size=12, font_color='white', showarrow=False)]
         )
 
-        # 2. Gráfico de Barras (Top Constelações)
+        # Grafico de Barras Top Constelacoes
         top_const = df_f[df_f['CONSTELLATION'] != 'Other']['CONSTELLATION'].value_counts().head(10)
         
         if bar_mode == 'COUNTRY':
-            # Varre o teu dataset filtrado à procura da coluna correspondente ao país do satélite
+            # Procura da coluna correspondente ao pais do satelite
             country_col = None
             for col in ['COUNTRY', 'COUNTRY_CODE', 'OWNER']:
                 if col in df_f.columns:
@@ -1468,11 +1465,11 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             else:
                 top_data = pd.Series(dtype=int)
             chart_title = "TOP COUNTRIES"
-            marker_color = '#e66b8b' # Muda para a cor rosa coral para dar um feedback visual de mudança
+            marker_color = '#e66b8b' # Cor de feedback visual de mudanca
         else:
             top_data = df_f[df_f['CONSTELLATION'] != 'Other']['CONSTELLATION'].value_counts().head(10)
             chart_title = "TOP CONSTELLATIONS"
-            marker_color = '#4a6fa5' # Teu azul padrão original
+            marker_color = '#4a6fa5' # Cor padrao original
 
         fig_bar = go.Figure(data=[go.Bar(x=top_data.index.tolist(), y=top_data.values, marker_color=marker_color)])
         fig_bar.update_layout(
@@ -1487,7 +1484,7 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             yaxis=dict(showgrid=True, gridcolor='#2d3748', color='white', tickfont=dict(size=10))
         )
 
-        # 3. Gráfico de Violino (Altitudes)
+        # Grafico de Violino Altitudes
         if not df_f.empty and 'X' in df_f.columns:
             altitudes_f = np.sqrt(df_f['X']**2 + df_f['Y']**2 + df_f['Z']**2) - 6371
         else:
@@ -1503,10 +1500,10 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
         
         fig_viol = go.Figure()
         
-        # Adicionamos apenas a visualização "ALL" (que mostra tudo)
+        # Visualizacao completa
         fig_viol.add_trace(go.Violin(y=get_sample_f(mask_all_f), visible=True, name='ALL', **v_style))
 
-        # O layout agora está limpo, sem a lista updatemenus
+        # Layout sem lista updatemenus
         fig_viol.update_layout(
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)', 
@@ -1516,14 +1513,13 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             showlegend=False
         )
 
-        # 4. Gráfico de Linha (Evolução Cumulativa por ano)
+        # Grafico de Linha Evolucao Cumulativa por ano
         if 'LAUNCH_YEAR' in df_f.columns:
             launches_f = df_f.groupby('LAUNCH_YEAR').size().reset_index(name='count')
             
-            # --- NOVO: Ordenar por ano e calcular a soma cumulativa ---
+            # Ordenar por ano e calcular a soma cumulativa
             launches_f = launches_f.sort_values('LAUNCH_YEAR')
             launches_f['cumulative_count'] = launches_f['count'].cumsum()
-            # --------------------------------------------------------
             
             launches_f = launches_f[launches_f['LAUNCH_YEAR'] >= 1960]
         else:
@@ -1531,7 +1527,7 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             
         fig_line = go.Figure(data=[go.Scatter(
             x=launches_f['LAUNCH_YEAR'], 
-            y=launches_f['cumulative_count'], # <-- Usar a nova coluna cumulativa
+            y=launches_f['cumulative_count'], # Usar a nova coluna cumulativa
             mode='lines+markers',
             line=dict(color='#4a6fa5', width=2), marker=dict(size=4),
             hovertemplate="<b>Year:</b> %{x}<br><b>Total Objects:</b> %{y}<extra></extra>"
@@ -1543,14 +1539,14 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
         )
         
     else:
-        # Se foi o live-update ou um clique num satélite, NÃO atualizamos os gráficos
+        # Nao atualiza graficos no live update ou clique
         fig_pie  = dash.no_update
         fig_bar  = dash.no_update
         fig_viol = dash.no_update
         fig_line = dash.no_update
         chart_title = dash.no_update
 
-    # operational status code
+    # Operational status code
     status_col = 'OPS_STATUS_CODE'
 
     if status_col:
@@ -1559,7 +1555,7 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
         total_r  = len(df_f[df_f[status_col] == '-'])
         total_d  = len(df_f[df_f[status_col] == 'D'])
     else:
-        # Fallback de segurança simplificado caso a coluna exata falhe no ficheiro
+        # Fallback de seguranca simplificado
         total_o  = len(df_f[df_f['OBJECT_TYPE'].isin(['Satellite', 'Space Station'])])
         total_ar = 0
         total_r  = len(df_f[df_f['OBJECT_TYPE'] == 'Debris'])
@@ -1570,7 +1566,7 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
     texto_r_novo        = f"{total_r:,}"
     texto_d_novo        = f"{total_d:,}"
 
-    # --- LÓGICA DO NOVO RELÓGIO HTML ---
+    # Logica do relogio HTML
     if time_offset != 0:
         display_time = (datetime.utcnow() + timedelta(hours=time_offset)).strftime('%Y-%m-%d %H:%M:%S')
         clock_color  = '#ffd700'
@@ -1589,25 +1585,25 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
     }
 
     return (
-        fig,                    # 1. globe-3d.figure
-        info_children,          # 2. satellite-data-container.children
-        btn_style,              # 3. check-conjunctions-btn.style
-        fig_pct_nova,           # 4. kpi-pct-graph.figure
-        f"{total_filtrado:,}",  # 5. kpi-objects-count.children
-        fig_pie,                # 6. pie-type-object.figure
-        fig_bar,                # 7. bar-constellations.figure
-        fig_viol,               # 8. violin-altitude.figure
-        fig_line,               # 9. line-launches.figure
-        texto_o_novo,           # 10. kpi-o-count.children
-        texto_ar_novo,          # 11. kpi-ar-count.children
-        texto_r_novo,           # 12. kpi-r-count.children
-        texto_d_novo,           # 13. kpi-d-count.children
-        clock_text,             # 14. utc-clock-display.children
-        clock_style,            # 15. utc-clock-display.style
-        chart_title             # 16. bar-chart-title.children
+        fig,                    # Atualiza figura do globo
+        info_children,          # Informacao do satelite
+        btn_style,              # Estilo do botao
+        fig_pct_nova,           # Grafico percentagem
+        f"{total_filtrado:,}",  # Contagem de objetos
+        fig_pie,                # Grafico circular
+        fig_bar,                # Grafico barras
+        fig_viol,               # Grafico violino
+        fig_line,               # Grafico linha
+        texto_o_novo,           # Contagem ativa
+        texto_ar_novo,          # Contagem reserva
+        texto_r_novo,           # Contagem inativa
+        texto_d_novo,           # Contagem decaida
+        clock_text,             # Relogio texto
+        clock_style,            # Relogio estilo
+        chart_title             # Titulo grafico barras
     )
 
-# --- Modal abertura/fecho ---
+# Modal abertura ou fecho
 @callback(
     Output('conjunction-modal', 'style'),
     Output('modal-title',       'children'),
@@ -1629,7 +1625,7 @@ def toggle_modal(open_clicks, close_clicks, selected_idx, current_style):
     return current_style, dash.no_update
 
 
-# --- Tabela de conjunções ---
+# Tabela de conjuncoes
 @callback(
     Output('conjunction-table',     'data'),
     Output('conj-table-data-store', 'data'),
@@ -1658,7 +1654,7 @@ def update_conjunction_table(open_clicks, days, norad_id):
         return [], []
 
 
-# --- Botão "Ver Órbitas" aparece quando há linha selecionada ---
+# Botao Ver Orbitas visivel quando ha linha selecionada
 @callback(
     Output('view-conj-orbits-btn', 'style'),
     Input('conjunction-table', 'selected_rows'),
@@ -1678,11 +1674,11 @@ def show_view_orbits_btn(selected_rows, table_data):
             'padding': '8px 18px', 
             'fontSize': '12px', 
             'display': 'block',
-            'border': 'none'                # Remove a borda padrão
+            'border': 'none'                # Remove a borda padrao
         }
     return {'display': 'none'}
 
-# --- Activar visualização de conjunção (fechar modal de tabela e guardar stores) ---
+# Activar visualizacao de conjuncao fechar modal e guardar stores
 @callback(
     Output('conjunction-modal',    'style', allow_duplicate=True),
     Output('conj-view-active',     'data'),
@@ -1706,7 +1702,7 @@ def activate_conj_view(n_clicks, selected_rows, table_data, primary_norad, modal
     return new_modal_style, True, primary_norad, secondary_norad, conj_time
 
 
-# --- Construir o modal de órbitas de conjunção ---
+# Construir o modal de orbitas de conjuncao
 @callback(
     Output('conj-orbit-modal',   'style'),
     Output('globe-conjunction',  'figure'),
@@ -1739,7 +1735,7 @@ def render_conj_orbit_view(is_active, back_clicks, close_clicks,
     if not is_active:
         return hidden_style, dash.no_update, dash.no_update, dash.no_update
 
-    # Posicionar o time-travel-slider na hora da conjunção
+    # Posicionar o slider de tempo na hora da conjuncao
     slider_val = 0
     if conj_time_str:
         try:
@@ -1773,7 +1769,7 @@ def render_conj_orbit_view(is_active, back_clicks, close_clicks,
     return shown_style, fig, title, slider_val
 
 
-# --- "Voltar à Tabela": reabre o modal de conjunções ---
+# Voltar a Tabela reabre o modal de conjuncoes
 @callback(
     Output('conjunction-modal', 'style', allow_duplicate=True),
     Output('conj-view-active',  'data',  allow_duplicate=True),
@@ -1786,7 +1782,7 @@ def back_to_table(n_clicks, modal_style):
         return {**modal_style, 'display': 'flex'}, False
     return dash.no_update, dash.no_update
 
-# --- Forçar os quadrados (multi) a comportarem-se como seleção única ---
+# Forcar selecao unica
 @callback(
     Output('conjunction-table', 'selected_rows'),
     Input('conjunction-table', 'selected_rows'),
@@ -1794,7 +1790,7 @@ def back_to_table(n_clicks, modal_style):
 )
 def limit_checkbox_selection(selected_rows):
     if selected_rows and len(selected_rows) > 1:
-        # Se detetar mais que um selecionado, mantém apenas o último (o recém-clicado)
+        # Mantem apenas o ultimo selecionado
         return [selected_rows[-1]]
     return dash.no_update
 
