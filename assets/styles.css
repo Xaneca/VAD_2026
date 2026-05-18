@@ -57,41 +57,48 @@
    CUSTOMIZAÇÃO DA BARRA DE PESQUISA (Dash Dropdown Cyberpunk)
    ============================================================ */
 
+/* 1. Fundo da barra principal */
 .dash-dropdown .Select-control {
-    background-color: #10151f !important; /* Fundo escuro camuflado */
-    border: 1px solid #2d3748 !important;   /* Borda discreta */
+    background-color: #10151f !important;
+    border: 1px solid #2d3748 !important;
     border-radius: 6px !important;
 }
 
-.dash-dropdown .Select-value-label,
-.dash-dropdown .Select-placeholder,
-.dash-dropdown input {
-    color: #ffffff !important;             /* Texto em branco puro */
+/* 2. Cor do "Placeholder" (Type satellite name...) */
+.dash-dropdown .Select-placeholder {
+    color: #6b7280 !important;
 }
 
-.dash-dropdown .Select-menu-outer {
-    background-color: #10151f !important; /* Fundo escuro para a lista */
-    border: 1px solid #4a6fa5 !important;   /* Borda com o azul do teu tema */
-}
-
-.dash-dropdown .Select-option {
-    background-color: #10151f !important;
+/* 3. Cor do texto quando escreves e do satélite selecionado */
+.dash-dropdown .Select-input input,
+.dash-dropdown .Select-value-label {
     color: #ffffff !important;
-    cursor: pointer;
 }
 
-.dash-dropdown .Select-option:hover,
-.dash-dropdown .is-focused {
-    background-color: #1f2735 !important; /* Fundo ligeiramente mais claro */
-    color: #00d4ff !important;            /* Texto acende em Ciano brilhante! */
+/* 4. Fundo do menu que abre para baixo */
+.dash-dropdown .Select-menu-outer {
+    background-color: #10151f !important;
+    border: 1px solid #4a6fa5 !important;
 }
 
+/* 5. Cor base das opções na lista (Usa VirtualizedSelect por ter muitos itens) */
+.dash-dropdown .VirtualizedSelectOption {
+    background-color: #10151f !important;
+    color: #e2e8f0 !important;
+}
+
+/* 6. Hover nas opções (Fica Ciano brilhante!) */
+.dash-dropdown .VirtualizedSelectFocusedOption {
+    background-color: #1f2735 !important;
+    color: #00d4ff !important;
+}
+
+/* 7. Cor da setinha e do "X" de limpar */
 .dash-dropdown .Select-clear,
 .dash-dropdown .Select-arrow {
     color: #9ca3af !important;
 }
 
-<<<<<<< HEAD
 /* Forçar as letras a branco, negrito e preparar a transição de cor */
 .check-conjunctions-btn {
     color: #ffffff !important;
@@ -153,7 +160,8 @@ td.dash-select-cell input[type="checkbox"] {
 #conj-close-btn:hover {
     background-color: #5c0000 !important; 
     cursor: pointer;
-=======
+}
+
 /* ============================================================
    SEGMENTED TOGGLE (Transformar Rádios Feios em Pílulas Sleek)
    ============================================================ */
@@ -198,5 +206,4 @@ td.dash-select-cell input[type="checkbox"] {
 /* Efeito visual ao passar o rato por cima dos botões apagados */
 .cyber-toggle label:hover:not(:has(input:checked)) {
     color: #00d4ff !important;            /* Acende em ciano antes de clicares */
->>>>>>> b0703668cc4b9ce5f1a15a5119eb3bfeb992b206
 }

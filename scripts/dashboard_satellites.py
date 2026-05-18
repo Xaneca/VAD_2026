@@ -647,12 +647,22 @@ fig_violin.update_layout(
     showlegend=False
 )
 
-df_3d['EPOCH_YEAR'] = pd.to_datetime(df_3d['EPOCH'], errors='coerce').dt.year
-launches = df_3d.groupby('EPOCH_YEAR').size().reset_index(name='count')
-launches = launches[launches['EPOCH_YEAR'] >= 1960]
+df_3d['LAUNCH_YEAR'] = pd.to_datetime(df_3d['LAUNCH_DATE'], errors='coerce').dt.year
+launches = df_3d.groupby('LAUNCH_YEAR').size().reset_index(name='count')
+
+# --- NOVO: Ordenar por ano e calcular a soma cumulativa ---
+launches = launches.sort_values('LAUNCH_YEAR')
+launches['cumulative_count'] = launches['count'].cumsum()
+# --------------------------------------------------------
+
+launches = launches[launches['LAUNCH_YEAR'] >= 1960]
+
 fig_line = go.Figure(data=[go.Scatter(
-    x=launches['EPOCH_YEAR'], y=launches['count'], mode='lines+markers',
-    line=dict(color='#4a6fa5', width=2), marker=dict(size=4)
+    x=launches['LAUNCH_YEAR'], 
+    y=launches['cumulative_count'], # <-- Usar a nova coluna cumulativa
+    mode='lines+markers',
+    line=dict(color='#4a6fa5', width=2), marker=dict(size=4),
+    hovertemplate="<b>Year:</b> %{x}<br><b>Total Objects:</b> %{y}<extra></extra>" # Tooltip melhorado
 )])
 fig_line.update_layout(
     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=35,r=20,t=10,b=20),
@@ -1017,7 +1027,7 @@ layout = html.Div(style={
                         } for idx, row in df_3d.iterrows()
                     ],
                     placeholder="Type satellite name or NORAD ID...",
-                    searchable=True,  # 👈 Ativa a pesquisa por texto!
+                    searchable=True,
                     clearable=True,
                     className='dash-dropdown',
                     style={'width': '100%', 'color': 'black'}
@@ -1025,10 +1035,6 @@ layout = html.Div(style={
             ]),
             html.Div('FILTERS', style={'color': COLORS['text'], 'fontSize': '15px', 'fontWeight': 'bold', 'marginBottom': '15px', 'borderBottom': '1px solid #4a6fa5', 'paddingBottom': '10px'}),
             *[make_filter_section(g) for g in filter_groups],
-            # html.Button('Apply Filters', id='apply-filters', n_clicks=0, style={
-            #     **button_style, 'marginTop': 'auto', 'width': '100%',
-            #     'backgroundColor': '#4a6fa5', 'fontWeight': 'bold', 'padding': '12px'
-            # })
         ]),
 
         # Linha 4
@@ -1510,16 +1516,25 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             showlegend=False
         )
 
-        # 4. Gráfico de Linha (Lançamentos por ano)
-        if 'EPOCH_YEAR' in df_f.columns:
-            launches_f = df_f.groupby('EPOCH_YEAR').size().reset_index(name='count')
-            launches_f = launches_f[launches_f['EPOCH_YEAR'] >= 1960]
+        # 4. Gráfico de Linha (Evolução Cumulativa por ano)
+        if 'LAUNCH_YEAR' in df_f.columns:
+            launches_f = df_f.groupby('LAUNCH_YEAR').size().reset_index(name='count')
+            
+            # --- NOVO: Ordenar por ano e calcular a soma cumulativa ---
+            launches_f = launches_f.sort_values('LAUNCH_YEAR')
+            launches_f['cumulative_count'] = launches_f['count'].cumsum()
+            # --------------------------------------------------------
+            
+            launches_f = launches_f[launches_f['LAUNCH_YEAR'] >= 1960]
         else:
-            launches_f = pd.DataFrame(columns=['EPOCH_YEAR', 'count'])
+            launches_f = pd.DataFrame(columns=['LAUNCH_YEAR', 'cumulative_count'])
             
         fig_line = go.Figure(data=[go.Scatter(
-            x=launches_f['EPOCH_YEAR'], y=launches_f['count'], mode='lines+markers',
-            line=dict(color='#4a6fa5', width=2), marker=dict(size=4)
+            x=launches_f['LAUNCH_YEAR'], 
+            y=launches_f['cumulative_count'], # <-- Usar a nova coluna cumulativa
+            mode='lines+markers',
+            line=dict(color='#4a6fa5', width=2), marker=dict(size=4),
+            hovertemplate="<b>Year:</b> %{x}<br><b>Total Objects:</b> %{y}<extra></extra>"
         )])
         fig_line.update_layout(
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=35,r=20,t=10,b=20),
@@ -1588,8 +1603,8 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
         texto_r_novo,           # 12. kpi-r-count.children
         texto_d_novo,           # 13. kpi-d-count.children
         clock_text,             # 14. utc-clock-display.children
-        clock_style,             # 15. utc-clock-display.style
-        chart_title
+        clock_style,            # 15. utc-clock-display.style
+        chart_title             # 16. bar-chart-title.children
     )
 
 # --- Modal abertura/fecho ---
