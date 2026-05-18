@@ -370,8 +370,8 @@ COLOR_MAP = {
     'Debris':        '#8B0000',
     'Rocket Body':   '#F08080',
     'Space Station': '#1E90FF',
-    'Component':     '#FFD700',
-    'In Analysis':   '#FFA500',
+    'Component':     "#FFE347",
+    'In Analysis':   "#EA7E0C",
     'Unknown':       '#A9A9A9'
 }
 
@@ -611,7 +611,7 @@ fig_type_object.update_layout(
     annotations=[dict(text='Type<br>object', x=0.5, y=0.5, font_size=12, font_color='white', showarrow=False)]
 )
 
-top_constellations = df_3d[df_3d['CONSTELLATION'] != 'Other']['CONSTELLATION'].value_counts().head(6)
+top_constellations = df_3d[df_3d['CONSTELLATION'] != 'Other']['CONSTELLATION'].value_counts().head(10)
 fig_bar = go.Figure(data=[go.Bar(x=top_constellations.index.tolist(), y=top_constellations.values, marker_color='#4a6fa5')])
 fig_bar.update_layout(
     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=20,r=20,t=10,b=20),
@@ -774,7 +774,7 @@ fig_lifespan.update_layout(
     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
     margin=dict(l=40, r=20, t=20, b=10),
     xaxis=dict(color='white', showgrid=False, title="Years Spent in Orbit"),
-    yaxis=dict(color='white', showgrid=True, gridcolor='#2d3748', title="Object Count", type='log')
+    yaxis=dict(color='white', showgrid=True, gridcolor='#2d3748', title="Object Count (Log)", type='log')
 )
 
 # ============================================================
