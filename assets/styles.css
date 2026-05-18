@@ -1,4 +1,4 @@
-/* O estilo base do botão (passivo) */
+/* Estilo base do botao */
 .nav-pill-btn {
     padding: 6px 16px;
     border-radius: 20px;
@@ -6,121 +6,121 @@
     font-weight: 500;
     text-decoration: none;
     display: inline-block;
-    background-color: #1f2937;  /* Fundo cinza escuro */
-    color: #9ca3af;             /* Texto cinza claro */
-    border: 1px solid #374151;  /* Borda discreta */
+    background-color: #1f2937;  /* Cor de fundo */
+    color: #9ca3af;             /* Cor do texto */
+    border: 1px solid #374151;  /* Estilo da borda */
     cursor: pointer;
-    transition: all 0.3s ease;  /* Faz a mudança de cor ser suave e não brusca! */
+    transition: all 0.3s ease;  /* Transicao de cor suave */
 }
 
-/* O estado mágico de Hover (quando o rato passa por cima) */
+/* Estado hover do botao */
 .nav-pill-btn:hover {
-    background-color: #00d4ff;  /* Fundo muda para o teu azul ciano */
-    color: #000000;             /* Texto muda para preto para contrastar */
+    background-color: #00d4ff;  /* Cor de fundo hover */
+    color: #000000;             /* Cor do texto hover */
     border-color: #00d4ff;
-    box-shadow: 0 0 10px rgba(0, 212, 255, 0.4); /* (Opcional) Dá um brilho subtil! */
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.4); /* Efeito de sombra */
 }
 
 /* ============================================================
-   CUSTOMIZAÇÃO DA SCROLLBAR (Para Chrome, Edge e Safari)
+   CUSTOMIZACAO DA SCROLLBAR
    ============================================================ */
 
 ::-webkit-scrollbar {
-    width: 6px;               /* À esquerda/direita (vertical) */
-    height: 6px;              /* Abaixo (horizontal) */
+    width: 6px;               /* Largura da scrollbar vertical */
+    height: 6px;              /* Altura da scrollbar horizontal */
 }
 
 ::-webkit-scrollbar-track {
-    background: #10151f;      /* Cor escura igual ao fundo do teu painel */
+    background: #10151f;      /* Cor de fundo da calha */
     border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #2d3748;      /* Um cinza azulado discreto para não distrair */
+    background: #2d3748;      /* Cor do manipulo da scrollbar */
     border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #00d4ff;      /* Acende em Cyan brilhante quando passas o rato! */
+    background: #00d4ff;      /* Cor do manipulo no estado hover */
     cursor: pointer;
 }
 
 /* ============================================================
-   SUPORTE PARA FIREFOX (Norma standard moderna)
+   SUPORTE PARA FIREFOX
    ============================================================ */
 * {
-    scrollbar-width: thin;          /* Torna a barra mais fininha e elegante */
-    scrollbar-color: #2d3748 #10151f; /* [Cor do manípulo] [Cor da calha] */
+    scrollbar-width: thin;          /* Largura da scrollbar */
+    scrollbar-color: #2d3748 #10151f; /* Cores do manipulo e da calha */
 }
 
 /* ============================================================
-   CUSTOMIZAÇÃO DA BARRA DE PESQUISA (Dash Dropdown Cyberpunk)
+   CUSTOMIZACAO DA BARRA DE PESQUISA
    ============================================================ */
 
-/* 1. Fundo da barra principal */
+/* Fundo da barra principal */
 .dash-dropdown .Select-control {
     background-color: #10151f !important;
     border: 1px solid #2d3748 !important;
     border-radius: 6px !important;
 }
 
-/* 2. Cor do "Placeholder" (Type satellite name...) */
+/* Cor do texto placeholder */
 .dash-dropdown .Select-placeholder {
     color: #6b7280 !important;
 }
 
-/* 3. Cor do texto quando escreves e do satélite selecionado */
+/* Cor do texto introduzido e selecionado */
 .dash-dropdown .Select-input input,
 .dash-dropdown .Select-value-label {
     color: #ffffff !important;
 }
 
-/* 4. Fundo do menu que abre para baixo */
+/* Fundo do menu pendente */
 .dash-dropdown .Select-menu-outer {
     background-color: #10151f !important;
     border: 1px solid #4a6fa5 !important;
 }
 
-/* 5. Cor base das opções na lista (Usa VirtualizedSelect por ter muitos itens) */
+/* Cor base das opcoes na lista */
 .dash-dropdown .VirtualizedSelectOption {
     background-color: #10151f !important;
     color: #e2e8f0 !important;
 }
 
-/* 6. Hover nas opções (Fica Ciano brilhante!) */
+/* Estado hover nas opcoes da lista */
 .dash-dropdown .VirtualizedSelectFocusedOption {
     background-color: #1f2735 !important;
     color: #00d4ff !important;
 }
 
-/* 7. Cor da setinha e do "X" de limpar */
+/* Cor dos icones de seta e limpeza */
 .dash-dropdown .Select-clear,
 .dash-dropdown .Select-arrow {
     color: #9ca3af !important;
 }
 
-/* Forçar as letras a branco, negrito e preparar a transição de cor */
+/* Estilos de texto e transicao */
 .check-conjunctions-btn {
     color: #ffffff !important;
     font-weight: bold !important;
-    transition: filter 0.2s ease-in-out !important; /* Transição suave */
+    transition: filter 0.2s ease-in-out !important; /* Transicao de filtro */
 }
 
-/* Efeito Hover: reduz a luminosidade do botão para 75% (escurece) */
+/* Estado hover com reducao de luminosidade */
 .check-conjunctions-btn:hover {
     filter: brightness(75%) !important;
-    cursor: pointer !important; /* Muda o ponteiro do rato para a mãozinha */
+    cursor: pointer !important; /* Alteracao do cursor */
 }
 
 
-/* Estilos para o botão Conjunctions */
+/* Estilos do botao de conjuncoes */
 #check-conjunctions-btn {
-    color: #ffffff !important; /* Garante que o texto é sempre branco */
+    color: #ffffff !important; /* Cor do texto do botao */
     transition: background-color 0.2s ease-in-out;
 }
 
 #check-conjunctions-btn:hover {
-    background-color: #2d4a6f !important; /* Uma versão mais escura do azul original (#4a6fa5) */
+    background-color: #2d4a6f !important; /* Cor de fundo no estado hover */
     cursor: pointer;
 }
 
@@ -129,53 +129,53 @@
     display: none !important;
 }
 
-/* Estilo dos quadrados de seleção na tabela */
+/* Estilo das caixas de selecao na tabela */
 td.dash-select-cell input[type="checkbox"] {
     accent-color: #4a6fa5 !important;
     cursor: pointer;
 }
 
-/* Transição suave e hover para o botão de Ver Órbitas */
+/* Transicao do botao de visualizacao de orbitas */
 #view-conj-orbits-btn {
     transition: background-color 0.2s ease-in-out, transform 0.1s;
 }
 
 #view-conj-orbits-btn:hover {
-    background-color: #00a8cc !important; /* Um tom de ciano mais escuro */
+    background-color: #00a8cc !important; /* Cor de fundo hover do botao de orbitas */
     cursor: pointer;
 }
 
-/* Transições para os botões do modal de Órbitas */
+/* Transicoes dos botoes do modal */
 #conj-back-btn, #conj-close-btn {
     transition: background-color 0.2s ease-in-out;
 }
 
-/* Fica um tom mais escuro que o #2d3748 padrão */
+/* Cor de fundo hover do botao de retroceder */
 #conj-back-btn:hover {
     background-color: #1a2332 !important; 
     cursor: pointer;
 }
 
-/* Fica um vermelho mais escuro (Darker Red) */
+/* Cor de fundo hover do botao de fecho */
 #conj-close-btn:hover {
     background-color: #5c0000 !important; 
     cursor: pointer;
 }
 
 /* ============================================================
-   SEGMENTED TOGGLE (Transformar Rádios Feios em Pílulas Sleek)
+   SEGMENTED TOGGLE
    ============================================================ */
 
-/* O contentor principal que junta os dois botões */
+/* Contentor principal do toggle */
 .cyber-toggle {
     display: flex !important;
-    background-color: #10151f;   /* Fundo escuro igual ao do teu painel */
-    border: 1px solid #2d3748;   /* Borda discreta */
-    border-radius: 20px;         /* Cantos arredondados estilo pílula */
+    background-color: #10151f;   /* Cor de fundo do toggle */
+    border: 1px solid #2d3748;   /* Estilo da borda do toggle */
+    border-radius: 20px;         /* Arredondamento dos cantos */
     padding: 2px;
 }
 
-/* Esconde completamente as bolinhas nativas do rádio */
+/* Ocultacao dos inputs de radio nativos */
 .cyber-toggle input[type="radio"] {
     position: absolute;
     opacity: 0;
@@ -183,27 +183,27 @@ td.dash-select-cell input[type="checkbox"] {
     height: 0;
 }
 
-/* Estilo base de cada botão de texto */
+/* Estilo base dos labels de texto */
 .cyber-toggle label {
     padding: 5px 15px !important;
     font-size: 11px !important;
     font-weight: bold !important;
-    color: #9ca3af;              /* Cor cinza apagada quando não ativo */
+    color: #9ca3af;              /* Cor do texto inativo */
     cursor: pointer;
-    border-radius: 15px;         /* Arredonda individualmente cada lado */
+    border-radius: 15px;         /* Arredondamento dos labels */
     transition: all 0.25s ease-in-out;
-    margin: 0 !important;        /* Remove margens chatas do Dash */
+    margin: 0 !important;        /* Remocao de margens */
     display: inline-block;
 }
 
-/* Quando o rádio lá dentro está marcado, acende o botão! */
+/* Estado ativo do label */
 .cyber-toggle label:has(input:checked) {
-    background-color: #4a6fa5 !important; /* O teu azul padrão do tema */
-    color: #ffffff !important;            /* Texto passa a branco puro */
-    box-shadow: 0 0 10px rgba(74, 111, 165, 0.4); /* Efeito neon suave */
+    background-color: #4a6fa5 !important; /* Cor de fundo estado ativo */
+    color: #ffffff !important;            /* Cor do texto estado ativo */
+    box-shadow: 0 0 10px rgba(74, 111, 165, 0.4); /* Sombra de destaque */
 }
 
-/* Efeito visual ao passar o rato por cima dos botões apagados */
+/* Estado hover dos labels inativos */
 .cyber-toggle label:hover:not(:has(input:checked)) {
-    color: #00d4ff !important;            /* Acende em ciano antes de clicares */
+    color: #00d4ff !important;            /* Cor do texto hover inativo */
 }
