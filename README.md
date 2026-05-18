@@ -1,8 +1,6 @@
-# 🛰️ Space Logistics & Satellite Tracking Dashboard 🚀
+# 🛰️  Satellite Tracking Dashboard
 
-Welcome to the **Space Logistics & Satellite Tracking Dashboard**! This is an interactive, high-performance analytical ecosystem developed in **Python** using **Dash** and **Plotly (WebGL)**. The project monitors, filters, and analyzes telemetry data for over 42,000 space objects (satellites and debris) in orbit, as well as the global history of aerospace launch sites since the beginning of the space age in 1957.
-
-The application features a modern *Dark/Cyberpunk* design theme, fully optimized for geospatial data visualization and advanced cross-filtering.
+Welcome to our **Satellite Tracking Dashboard**! This is an interactive, high-performance analytical ecosystem developed in **Python** using **Dash** and **Plotly (WebGL)**. The project monitors, filters, and analyzes telemetry data for over 42,000 space objects (satellites and debris) in orbit, as well as the global history of aerospace launch sites since the beginning of the space age in 1957.
 
 ---
 
@@ -26,7 +24,7 @@ Here is a preview of the dashboard interface and its real-time interactive behav
 
 ### 🌐 Satellite Panel (`/`)
 * **Interactive 3D Globe:** Smoothly renders over 42,000 points in space via WebGL, maintaining fluid rotation, panning, and zoom capabilities.
-* **Synchronized Global Filters:** A dynamic side panel that filters objects by type and orbital range (**LEO**, **MEO**, **GEO**). Applying a filter automatically recalculates and rebuilds the entire dashboard (including constellation bar charts and timelines) in one go.
+* **Synchronized Global Filters:** A dynamic side panel that filters objects by type and orbital range (**LEO**, **MEO**, **GEO**, **HEO**). Applying a filter automatically recalculates and rebuilds the entire dashboard (including constellation bar charts and timelines) in one go.
 * **Dynamic Donut KPI:** A centered circular chart indicating the exact percentage of selected objects relative to the total space catalog in real-time.
 
 ### 🚀 Launches Panel (`/launches`)
