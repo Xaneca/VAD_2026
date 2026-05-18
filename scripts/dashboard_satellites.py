@@ -1017,7 +1017,7 @@ layout = html.Div(style={
                         } for idx, row in df_3d.iterrows()
                     ],
                     placeholder="Type satellite name or NORAD ID...",
-                    searchable=True,  # 👈 Ativa a pesquisa por texto!
+                    searchable=True,
                     clearable=True,
                     className='dash-dropdown',
                     style={'width': '100%', 'color': 'black'}
@@ -1025,10 +1025,6 @@ layout = html.Div(style={
             ]),
             html.Div('FILTERS', style={'color': COLORS['text'], 'fontSize': '15px', 'fontWeight': 'bold', 'marginBottom': '15px', 'borderBottom': '1px solid #4a6fa5', 'paddingBottom': '10px'}),
             *[make_filter_section(g) for g in filter_groups],
-            # html.Button('Apply Filters', id='apply-filters', n_clicks=0, style={
-            #     **button_style, 'marginTop': 'auto', 'width': '100%',
-            #     'backgroundColor': '#4a6fa5', 'fontWeight': 'bold', 'padding': '12px'
-            # })
         ]),
 
         # Linha 4
@@ -1586,10 +1582,10 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
         texto_o_novo,           # 10. kpi-o-count.children
         texto_ar_novo,          # 11. kpi-ar-count.children
         texto_r_novo,           # 12. kpi-r-count.children
-        texto_d_novo,,           # 13. kpi-d-count.children
+        texto_d_novo,           # 13. kpi-d-count.children
         clock_text,             # 14. utc-clock-display.children
-        clock_style             # 15. utc-clock-display.style
-        chart_title
+        clock_style,            # 15. utc-clock-display.style
+        chart_title             # 16. bar-chart-title.children
     )
 
 # --- Modal abertura/fecho ---
