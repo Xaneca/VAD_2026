@@ -658,7 +658,7 @@ launches = launches[launches['LAUNCH_YEAR'] >= 1960]
 
 fig_line = go.Figure(data=[go.Scatter(
     x=launches['LAUNCH_YEAR'], 
-    y=launches['cumulative_count'], # Usar a nova coluna cumulativa
+    y=launches['cumulative_count'], # Usa a nova coluna cumulativa
     mode='lines+markers',
     line=dict(color='#4a6fa5', width=2), marker=dict(size=4),
     hovertemplate="<b>Year:</b> %{x}<br><b>Total Objects:</b> %{y}<extra></extra>" # Tooltip melhorado
@@ -871,7 +871,6 @@ layout = html.Div(style={
         'gridTemplateRows': '220px 80px 650px 450px',
         'gap': '15px', 'width': '100%',
     }, children=[
-        # Secao
         html.Div(style={**card_style, 'gridColumn': '1 / 3', 'gridRow': '1'}, children=[
             dcc.Graph(id='pie-type-object', figure=fig_type_object, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%'})
         ]),
@@ -895,8 +894,6 @@ layout = html.Div(style={
             ]),
             dcc.Graph(id='bar-constellations', figure=fig_bar, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
-
-        # Secao
 
         # Status
         html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '2', 'padding': '5px 10px'}, children=[
@@ -1034,7 +1031,6 @@ layout = html.Div(style={
             *[make_filter_section(g) for g in filter_groups],
         ]),
 
-        # Secao
         html.Div(style={**card_style, 'gridColumn': '1', 'gridRow': '4', 'padding': '15px', 'display': 'flex', 'flexDirection': 'column', 'minHeight': '350px'}, children=[
             html.Div(style={'textAlign': 'center', 'marginBottom': '5px'}, children=[
                 html.Div('ALTITUDE DENSITY', style={'color': COLORS['text'], 'fontSize': '12px', 'fontWeight': 'bold'}),
