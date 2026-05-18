@@ -91,6 +91,69 @@
     color: #9ca3af !important;
 }
 
+<<<<<<< HEAD
+/* Forçar as letras a branco, negrito e preparar a transição de cor */
+.check-conjunctions-btn {
+    color: #ffffff !important;
+    font-weight: bold !important;
+    transition: filter 0.2s ease-in-out !important; /* Transição suave */
+}
+
+/* Efeito Hover: reduz a luminosidade do botão para 75% (escurece) */
+.check-conjunctions-btn:hover {
+    filter: brightness(75%) !important;
+    cursor: pointer !important; /* Muda o ponteiro do rato para a mãozinha */
+}
+
+
+/* Estilos para o botão Conjunctions */
+#check-conjunctions-btn {
+    color: #ffffff !important; /* Garante que o texto é sempre branco */
+    transition: background-color 0.2s ease-in-out;
+}
+
+#check-conjunctions-btn:hover {
+    background-color: #2d4a6f !important; /* Uma versão mais escura do azul original (#4a6fa5) */
+    cursor: pointer;
+}
+
+.dash-range-slider-input,
+.dash-slider-input {
+    display: none !important;
+}
+
+/* Estilo dos quadrados de seleção na tabela */
+td.dash-select-cell input[type="checkbox"] {
+    accent-color: #4a6fa5 !important;
+    cursor: pointer;
+}
+
+/* Transição suave e hover para o botão de Ver Órbitas */
+#view-conj-orbits-btn {
+    transition: background-color 0.2s ease-in-out, transform 0.1s;
+}
+
+#view-conj-orbits-btn:hover {
+    background-color: #00a8cc !important; /* Um tom de ciano mais escuro */
+    cursor: pointer;
+}
+
+/* Transições para os botões do modal de Órbitas */
+#conj-back-btn, #conj-close-btn {
+    transition: background-color 0.2s ease-in-out;
+}
+
+/* Fica um tom mais escuro que o #2d3748 padrão */
+#conj-back-btn:hover {
+    background-color: #1a2332 !important; 
+    cursor: pointer;
+}
+
+/* Fica um vermelho mais escuro (Darker Red) */
+#conj-close-btn:hover {
+    background-color: #5c0000 !important; 
+    cursor: pointer;
+=======
 /* ============================================================
    SEGMENTED TOGGLE (Transformar Rádios Feios em Pílulas Sleek)
    ============================================================ */
@@ -135,4 +198,5 @@
 /* Efeito visual ao passar o rato por cima dos botões apagados */
 .cyber-toggle label:hover:not(:has(input:checked)) {
     color: #00d4ff !important;            /* Acende em ciano antes de clicares */
+>>>>>>> b0703668cc4b9ce5f1a15a5119eb3bfeb992b206
 }

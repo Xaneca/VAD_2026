@@ -486,15 +486,6 @@ def build_globe_figure(df_filtered, orbit_row=None, current_time_str="", time_of
         legend=dict(x=0.01, y=0.99, font=dict(color='white', size=10),
                     bgcolor='rgba(0,0,0,0.5)', bordercolor='#2d3748', itemsizing='constant'),
         margin=dict(l=0, r=0, t=0, b=0), uirevision='constant', hoverdistance=50,
-        annotations=[
-            dict(
-                text=f"🕒 {display_time} UTC",
-                x=0.02, y=0.15, xref="paper", yref="paper",
-                font=dict(color=clock_color, size=13, family="monospace"),
-                showarrow=False,
-                bgcolor="rgba(0,0,0,0.7)", bordercolor="#4a6fa5", borderpad=6
-            )
-        ] if display_time else []
     )
     return fig
 
@@ -537,7 +528,7 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
         fig.add_trace(go.Scatter3d(
             x=ox_e, y=oy_e, z=oz_e, mode='lines',
             line=dict(color='#00d4ff', width=2),
-            name=f"Órbita: {primary_row['NAME']}",
+            name=f"Orbit: {primary_row['NAME']}",
             hoverinfo='skip', showlegend=True
         ))
     except Exception as ex:
@@ -551,7 +542,7 @@ def build_conjunction_orbit_figure(primary_row, secondary_row, conjunction_time_
         fig.add_trace(go.Scatter3d(
             x=ox2_e, y=oy2_e, z=oz2_e, mode='lines',
             line=dict(color='#ff6b35', width=2),
-            name=f"Órbita: {secondary_row['NAME']}",
+            name=f"Orbit: {secondary_row['NAME']}",
             hoverinfo='skip', showlegend=True
         ))
     except Exception as ex:
@@ -793,6 +784,17 @@ app.index_string = '''
             .dash-range-slider-input {
                 display: none !important;
             }
+
+            /* 1. Remover DEFINITIVAMENTE os 3 pontos (...) da coluna de seleção */
+            td.dash-select-cell, 
+            td.dash-select-cell .dash-cell-value {
+                text-overflow: clip !important;
+                font-size: 0px !important;     /* Esconde os pontos forçando tamanho zero */
+                color: transparent !important; /* Torna invisível qualquer resquício */
+                max-width: 40px !important;    /* Dá espaço para o quadrado não ser esmagado */
+                overflow: visible !important;
+            }
+
             #time-travel-slider .rc-slider-track { background-color: #ffd700 !important; }
             #time-travel-slider .rc-slider-handle { border-color: #ffd700 !important; background-color: #ffd700 !important; }
             #time-travel-slider .rc-slider-handle:hover { box-shadow: 0 0 8px rgba(255,215,0,0.6) !important; }
@@ -942,12 +944,21 @@ layout = html.Div(style={
             ),
 
             # Slider de viagem no tempo
+            # Slider de viagem no tempo
             html.Div(id='time-travel-container', style={
                 'position': 'absolute', 'bottom': '20px', 'left': '20px',
                 'backgroundColor': 'rgba(13,20,33,0.85)', 'backdropFilter': 'blur(5px)',
-                'borderRadius': '10px', 'padding': '10px 16px 6px 16px',
+                'borderRadius': '10px', 'padding': '12px 16px 8px 16px', # padding ligeiramente ajustado
                 'border': '1px solid #2d3748', 'zIndex': '10', 'width': '260px',
             }, children=[
+                # --- NOVO RELÓGIO AQUI ---
+                html.Div(id='utc-clock-display', children='🕒 A calcular...', style={
+                    'color': 'white', 'fontSize': '14px', 'fontFamily': 'monospace', 
+                    'textAlign': 'center', 'marginBottom': '12px',
+                    'backgroundColor': 'rgba(0,0,0,0.6)', 'padding': '6px', 
+                    'borderRadius': '6px', 'border': '1px solid #2d3748'
+                }),
+                # -------------------------
                 html.Div(style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'marginBottom': '6px'}, children=[
                     html.Span('⏱ Time travel', style={'color': '#ffd700', 'fontSize': '11px', 'fontWeight': 'bold', 'letterSpacing': '0.5px'}),
                     html.Span(id='time-travel-label', children='+0h (Now)',
@@ -1072,7 +1083,7 @@ layout = html.Div(style={
                 'fontStyle': 'italic'
             }),
             html.Div(style={'width': '100%', 'marginBottom': '28px'}, children=[
-                html.Span('Janela de Tempo (Dias):', style={
+                html.Span('Time Window (Days):', style={
                     'color': '#9ca3af', 'fontSize': '12px', 'letterSpacing': '1px',
                     'textTransform': 'uppercase', 'marginBottom': '12px', 'display': 'block'
                 }),
@@ -1086,14 +1097,14 @@ layout = html.Div(style={
                 dash_table.DataTable(
                     id='conjunction-table',
                     columns=[
-                        {'name': 'Objeto Espacial', 'id': 'NAME'},
-                        {'name': 'NORAD ID',        'id': 'NORAD_ID'},
-                        {'name': 'Dist. Mín. (km)', 'id': 'MIN_DIST_KM'},
-                        {'name': 'Data/Hora (UTC)', 'id': 'TIME_UTC'},
+                        {'name': 'Space Object',       'id': 'NAME'},
+                        {'name': 'NORAD ID',           'id': 'NORAD_ID'},
+                        {'name': 'Min. Distance (km)', 'id': 'MIN_DIST_KM'},
+                        {'name': 'Date/Time (UTC)',    'id': 'TIME_UTC'},
                     ],
                     data=[],
                     page_size=10,
-                    row_selectable='single',
+                    row_selectable='multi',
                     selected_rows=[],
                     style_table={
                         'borderRadius': '8px', 'overflow': 'hidden',
@@ -1108,31 +1119,41 @@ layout = html.Div(style={
                     style_cell={
                         'backgroundColor': '#1a2332', 'color': '#e2e8f0', 'textAlign': 'left',
                         'border': 'none', 'borderBottom': '1px solid #2d3748',
-                        'padding': '6px 10px', 'fontSize': '12px',
-                        'overflow': 'hidden', 'textOverflow': 'ellipsis', 'maxWidth': '0'
+                        'padding': '6px 10px', 'fontSize': '12px'
+                        # Removemos o overflow, textOverflow e maxWidth daqui!
                     },
                     style_cell_conditional=[
-                        {'if': {'column_id': 'NAME'},        'width': '38%'},
+                        # Aplicamos os 3 pontos APENAS à coluna do Nome do satélite
+                        {'if': {'column_id': 'NAME'},        
+                         'width': '38%', 'overflow': 'hidden', 'textOverflow': 'ellipsis', 'maxWidth': '150px'},
                         {'if': {'column_id': 'NORAD_ID'},    'width': '14%'},
                         {'if': {'column_id': 'MIN_DIST_KM'}, 'width': '22%'},
                         {'if': {'column_id': 'TIME_UTC'},    'width': '26%'},
                     ],
                     style_data_conditional=[
                         {'if': {'row_index': 'odd'}, 'backgroundColor': '#162030'},
+                        
+                        # Risco Alto (< 10 km) - Vermelho Neon
                         {'if': {'filter_query': '{MIN_DIST_KM} < 10'},
-                         'backgroundColor': 'rgba(255,107,53,0.20)', 'color': '#ff6b35', 'fontWeight': 'bold'},
+                         'backgroundColor': 'rgba(255,75,75,0.15)', 'color': '#ff4b4b', 'fontWeight': 'bold'},
+                         
+                        # Risco Moderado (10 a 100 km) - Amarelo
                         {'if': {'filter_query': '{MIN_DIST_KM} >= 10 && {MIN_DIST_KM} < 100'},
                          'backgroundColor': 'rgba(255,215,0,0.08)', 'color': '#ffd700'},
+                         
+                        # Linha em hover / focada
                         {'if': {'state': 'active'},
                          'backgroundColor': '#2d3748', 'border': '1px solid #4a6fa5'},
+                         
+                        # Linha selecionada
                         {'if': {'state': 'selected'},
-                         'backgroundColor': 'rgba(74,111,165,0.3)', 'border': '1px solid #4a6fa5'},
+                         'backgroundColor': 'rgba(0, 212, 255, 0.2)', 'border': '1px solid #00d4ff'},
                     ],
                     style_as_list_view=True,
                 )
             ]),
             html.Div(style={'marginTop': '14px', 'display': 'flex', 'gap': '10px', 'justifyContent': 'flex-end'}, children=[
-                html.Button('🌍 Ver Órbitas no Globo', id='view-conj-orbits-btn', n_clicks=0, style={
+                html.Button('🌍 View Orbits', id='view-conj-orbits-btn', n_clicks=0, style={
                     **button_style, 'backgroundColor': '#ff6b35', 'fontWeight': 'bold',
                     'padding': '8px 18px', 'fontSize': '12px', 'display': 'none'
                 }),
@@ -1155,10 +1176,10 @@ layout = html.Div(style={
             'width': '92vw', 'height': '90vh',
             'backgroundColor': '#0d1421',
             'borderRadius': '16px',
-            'border': '1px solid #ff6b35',
+            'border': '1px solid #00d4ff', # <--- Trocado de laranja para ciano
             'display': 'flex', 'flexDirection': 'column',
             'overflow': 'hidden', 'position': 'relative',
-            'boxShadow': '0 0 40px rgba(255,107,53,0.25)',
+            'boxShadow': '0 0 40px rgba(0, 212, 255, 0.15)', # <--- Glow agora é ciano subtil
         }, children=[
             # Barra de título do modal de órbitas
             html.Div(style={
@@ -1166,22 +1187,24 @@ layout = html.Div(style={
                 'justifyContent': 'space-between',
                 'padding': '12px 20px',
                 'backgroundColor': '#0d1421',
-                'borderBottom': '1px solid #ff6b35',
+                'borderBottom': '1px solid #2d3748', # <--- Trocado para o cinza/azul padrão do tema
                 'flexShrink': '0',
             }, children=[
                 html.Span(id='conj-orbit-title', children='',
-                          style={'color': '#ff6b35', 'fontSize': '13px',
+                          style={'color': '#00d4ff', 'fontSize': '14px', # <--- Trocado para ciano
                                  'fontWeight': 'bold', 'letterSpacing': '0.5px',
                                  'flex': '1', 'marginRight': '16px'}),
                 html.Div(style={'display': 'flex', 'gap': '10px', 'flexShrink': '0'}, children=[
-                    html.Button('← Voltar à Tabela', id='conj-back-btn', n_clicks=0, style={
+                    html.Button('← Back to Table', id='conj-back-btn', n_clicks=0, style={ # <--- TRADUZIDO
                         **button_style,
                         'backgroundColor': '#2d3748',
+                        'color': '#ffffff',
                         'padding': '5px 14px', 'fontSize': '12px'
                     }),
-                    html.Button('✖ Fechar', id='conj-close-btn', n_clicks=0, style={
+                    html.Button('✖ Close', id='conj-close-btn', n_clicks=0, style={ # <--- TRADUZIDO
                         **button_style,
                         'backgroundColor': '#8B0000', 'color': 'white',
+                        'border': 'none', # Fica mais limpo sem borda
                         'padding': '5px 14px', 'fontSize': '12px'
                     }),
                 ]),
@@ -1296,9 +1319,10 @@ def update_time_label(hours):
     Output('kpi-ar-count', 'children'),
     Output('kpi-r-count', 'children'), 
     Output('kpi-d-count', 'children'),
+    Output('utc-clock-display', 'children'), 
+    Output('utc-clock-display', 'style'),    
     Output('bar-chart-title', 'children'),
     Input('live-update-interval', 'n_intervals'),
-    # Input('apply-filters',        'n_clicks'),
     Input('selected-object-idx',  'data'),
     Input('close-modal-btn',      'n_clicks'),
     Input('time-travel-slider',   'value'),
@@ -1530,7 +1554,25 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
     texto_ar_novo       = f"{total_ar:,}"
     texto_r_novo        = f"{total_r:,}"
     texto_d_novo        = f"{total_d:,}"
-    
+
+    # --- LÓGICA DO NOVO RELÓGIO HTML ---
+    if time_offset != 0:
+        display_time = (datetime.utcnow() + timedelta(hours=time_offset)).strftime('%Y-%m-%d %H:%M:%S')
+        clock_color  = '#ffd700'
+        border_color = '#ffd700'
+    else:
+        display_time = current_time_str
+        clock_color  = 'white'
+        border_color = '#2d3748'
+        
+    clock_text = f"🕒 {display_time} UTC"
+    clock_style = {
+        'color': clock_color, 'fontSize': '14px', 'fontFamily': 'monospace', 
+        'textAlign': 'center', 'marginBottom': '12px',
+        'backgroundColor': 'rgba(0,0,0,0.6)', 'padding': '6px', 
+        'borderRadius': '6px', 'border': f'1px solid {border_color}'
+    }
+
     return (
         fig,                    # 1. globe-3d.figure
         info_children,          # 2. satellite-data-container.children
@@ -1544,7 +1586,9 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
         texto_o_novo,           # 10. kpi-o-count.children
         texto_ar_novo,          # 11. kpi-ar-count.children
         texto_r_novo,           # 12. kpi-r-count.children
-        texto_d_novo,            # 13. kpi-d-count.children
+        texto_d_novo,           # 13. kpi-d-count.children
+        clock_text,             # 14. utc-clock-display.children
+        clock_style,             # 15. utc-clock-display.style
         chart_title
     )
 
@@ -1565,7 +1609,7 @@ def toggle_modal(open_clicks, close_clicks, selected_idx, current_style):
     if trigger == 'check-conjunctions-btn' and open_clicks:
         title = 'Análise de Conjunções'
         if selected_idx is not None and selected_idx in df_3d.index:
-            title = f"Risco de Colisão — {df_3d.loc[selected_idx, 'NAME']}"
+            title = f"Colision Risk — {df_3d.loc[selected_idx, 'NAME']}"
         return {**current_style, 'display': 'flex'}, title
     return current_style, dash.no_update
 
@@ -1612,11 +1656,16 @@ def show_view_orbits_btn(selected_rows, table_data):
         if str(row.get('NORAD_ID', '-')) == '-':
             return {'display': 'none'}
         return {
-            **button_style, 'backgroundColor': '#ff6b35', 'fontWeight': 'bold',
-            'padding': '8px 18px', 'fontSize': '12px', 'display': 'block'
+            **button_style, 
+            'backgroundColor': '#00d4ff',   # Fundo Ciano
+            'color': '#0d1421',             # Texto escuro para contraste
+            'fontWeight': 'bold',
+            'padding': '8px 18px', 
+            'fontSize': '12px', 
+            'display': 'block',
+            'border': 'none'                # Remove a borda padrão
         }
     return {'display': 'none'}
-
 
 # --- Activar visualização de conjunção (fechar modal de tabela e guardar stores) ---
 @callback(
@@ -1704,7 +1753,7 @@ def render_conj_orbit_view(is_active, back_clicks, close_clicks,
     fig    = build_conjunction_orbit_figure(primary_tle_row, secondary_tle_row, conj_time_str)
     p_name = str(primary_tle_row.get('NAME', primary_norad))
     s_name = str(secondary_tle_row.get('NAME', secondary_norad))
-    title  = f"⚠ Conjunção: {p_name}  ↔  {s_name}  |  {conj_time_str} UTC"
+    title  = f"⚠ Conjunction: {p_name}  ↔  {s_name}  |  {conj_time_str} UTC"
 
     return shown_style, fig, title, slider_val
 
@@ -1721,6 +1770,18 @@ def back_to_table(n_clicks, modal_style):
     if n_clicks:
         return {**modal_style, 'display': 'flex'}, False
     return dash.no_update, dash.no_update
+
+# --- Forçar os quadrados (multi) a comportarem-se como seleção única ---
+@callback(
+    Output('conjunction-table', 'selected_rows'),
+    Input('conjunction-table', 'selected_rows'),
+    prevent_initial_call=True
+)
+def limit_checkbox_selection(selected_rows):
+    if selected_rows and len(selected_rows) > 1:
+        # Se detetar mais que um selecionado, mantém apenas o último (o recém-clicado)
+        return [selected_rows[-1]]
+    return dash.no_update
 
 if __name__ == '__main__':
     app.run(debug=True)
