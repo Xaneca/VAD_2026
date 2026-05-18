@@ -630,7 +630,7 @@ mask_leo = (altitudes <= 2000)
 mask_meo = (altitudes > 2000) & (altitudes <= 35786)
 mask_geo = (altitudes > 35786) & (altitudes <= 40000)
 
-v_style = dict(box_visible=True, line_color='#4a6fa5', fillcolor='#2d4a6f', opacity=0.6)
+v_style = dict(box_visible=False, line_color='#4a6fa5', fillcolor='#2d4a6f', opacity=0.6)
 
 fig_violin = go.Figure()
 
@@ -755,7 +755,7 @@ reentered_df = reentered_df[reentered_df['YEARS_IN_ORBIT'] >= 0] # Remover poss√
 fig_lifespan = go.Figure(go.Histogram(
     x=reentered_df['YEARS_IN_ORBIT'],
     xbins=dict(start=0, end=25, size=1), # Agrupado de 1 em 1 ano
-    marker_color='#8ea4b8',
+    marker_color='#00d4ff',
     opacity=0.8,
     hovertemplate="<b>Lifespan:</b> %{x} years<br><b>Objects:</b> %{y}<extra></extra>"
 ))
@@ -764,7 +764,7 @@ fig_lifespan.update_layout(
     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
     margin=dict(l=40, r=20, t=20, b=10),
     xaxis=dict(color='white', showgrid=False, title="Years Spent in Orbit"),
-    yaxis=dict(color='white', showgrid=True, gridcolor='#2d3748', title="Object Count")
+    yaxis=dict(color='white', showgrid=True, gridcolor='#2d3748', title="Object Count", type='log')
 )
 
 # ============================================================
@@ -1040,12 +1040,12 @@ layout = html.Div(style={
         ]),
 
         # Decays
-        html.Div(style={**card_style, 'gridColumn': '1 / 4', 'gridRow': '5', 'minHeight': '400px'}, children=[
+        html.Div(style={**card_style, 'gridColumn': '1 / 3', 'gridRow': '5', 'minHeight': '400px'}, children=[
                 html.H3("Cumulative Total of Objects that Re-entered the Atmosphere (1957 - Present)", style={'fontWeight': 'normal', 'fontSize': '16px', 'marginBottom': '10px', 'textAlign': 'left', 'width': '100%'}),
                 dcc.Graph(figure=fig_reentered, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
 
-        html.Div(style={**card_style, 'gridColumn': '4', 'gridRow': '5', 'minHeight': '350px'}, children=[
+        html.Div(style={**card_style, 'gridColumn': '3 / 5', 'gridRow': '5', 'minHeight': '350px'}, children=[
             html.H3("Orbital Lifespan Distribution before Decay", style={'fontWeight': 'normal', 'fontSize': '15px', 'marginBottom': '10px', 'textAlign': 'left', 'width': '100%'}),
             dcc.Graph(figure=fig_lifespan, config={'displayModeBar': False}, style={'width': '100%', 'height': '100%', 'flex': '1'})
         ]),
@@ -1489,7 +1489,7 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             data = altitudes_f[mask]
             return data.sample(min(5000, len(data))) if len(data) > 0 else []
 
-        v_style = dict(box_visible=True, line_color='#4a6fa5', fillcolor='#2d4a6f', opacity=0.6)
+        v_style = dict(box_visible=False, line_color='#4a6fa5', fillcolor='#2d4a6f', opacity=0.6)
         
         fig_viol = go.Figure()
         
