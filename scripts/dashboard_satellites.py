@@ -647,12 +647,22 @@ fig_violin.update_layout(
     showlegend=False
 )
 
-df_3d['EPOCH_YEAR'] = pd.to_datetime(df_3d['EPOCH'], errors='coerce').dt.year
-launches = df_3d.groupby('EPOCH_YEAR').size().reset_index(name='count')
-launches = launches[launches['EPOCH_YEAR'] >= 1960]
+df_3d['LAUNCH_YEAR'] = pd.to_datetime(df_3d['LAUNCH_DATE'], errors='coerce').dt.year
+launches = df_3d.groupby('LAUNCH_YEAR').size().reset_index(name='count')
+
+# --- NOVO: Ordenar por ano e calcular a soma cumulativa ---
+launches = launches.sort_values('LAUNCH_YEAR')
+launches['cumulative_count'] = launches['count'].cumsum()
+# --------------------------------------------------------
+
+launches = launches[launches['LAUNCH_YEAR'] >= 1960]
+
 fig_line = go.Figure(data=[go.Scatter(
-    x=launches['EPOCH_YEAR'], y=launches['count'], mode='lines+markers',
-    line=dict(color='#4a6fa5', width=2), marker=dict(size=4)
+    x=launches['LAUNCH_YEAR'], 
+    y=launches['cumulative_count'], # <-- Usar a nova coluna cumulativa
+    mode='lines+markers',
+    line=dict(color='#4a6fa5', width=2), marker=dict(size=4),
+    hovertemplate="<b>Year:</b> %{x}<br><b>Total Objects:</b> %{y}<extra></extra>" # Tooltip melhorado
 )])
 fig_line.update_layout(
     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=35,r=20,t=10,b=20),
@@ -1506,16 +1516,25 @@ def update_globe(n_intervals, selected_idx, close_clicks, time_offset_hours,
             showlegend=False
         )
 
-        # 4. Gráfico de Linha (Lançamentos por ano)
-        if 'EPOCH_YEAR' in df_f.columns:
-            launches_f = df_f.groupby('EPOCH_YEAR').size().reset_index(name='count')
-            launches_f = launches_f[launches_f['EPOCH_YEAR'] >= 1960]
+        # 4. Gráfico de Linha (Evolução Cumulativa por ano)
+        if 'LAUNCH_YEAR' in df_f.columns:
+            launches_f = df_f.groupby('LAUNCH_YEAR').size().reset_index(name='count')
+            
+            # --- NOVO: Ordenar por ano e calcular a soma cumulativa ---
+            launches_f = launches_f.sort_values('LAUNCH_YEAR')
+            launches_f['cumulative_count'] = launches_f['count'].cumsum()
+            # --------------------------------------------------------
+            
+            launches_f = launches_f[launches_f['LAUNCH_YEAR'] >= 1960]
         else:
-            launches_f = pd.DataFrame(columns=['EPOCH_YEAR', 'count'])
+            launches_f = pd.DataFrame(columns=['LAUNCH_YEAR', 'cumulative_count'])
             
         fig_line = go.Figure(data=[go.Scatter(
-            x=launches_f['EPOCH_YEAR'], y=launches_f['count'], mode='lines+markers',
-            line=dict(color='#4a6fa5', width=2), marker=dict(size=4)
+            x=launches_f['LAUNCH_YEAR'], 
+            y=launches_f['cumulative_count'], # <-- Usar a nova coluna cumulativa
+            mode='lines+markers',
+            line=dict(color='#4a6fa5', width=2), marker=dict(size=4),
+            hovertemplate="<b>Year:</b> %{x}<br><b>Total Objects:</b> %{y}<extra></extra>"
         )])
         fig_line.update_layout(
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=35,r=20,t=10,b=20),
